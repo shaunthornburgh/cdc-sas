@@ -1,0 +1,750 @@
+# Casa Dolce Casa S.A.S. — Operations Platform
+
+Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
+
+| Part      | Stack                                                                  |
+|-----------|------------------------------------------------------------------------|
+| backend/  | FastAPI · SQLAlchemy 2.0 · Alembic · Pydantic v2 · PostgreSQL 16 · Redis |
+| frontend/ | Nuxt 3 · Vue 3 · TypeScript                                            |
+| local dev | Docker Compose (Postgres + Redis, API optional)                        |
+
+## Structure
+
+```
+.
+├── docker-compose.yml        # db (Postgres 16), redis, api (opt-in profile)
+├── backend/
+│   ├── app/
+│   │   ├── main.py           # FastAPI app factory, CORS, routers
+│   │   ├── core/config.py    # Settings (pydantic-settings, reads backend/.env)
+│   │   ├── db/base.py        # Declarative Base + UUID/timestamp mixins
+│   │   ├── db/session.py     # Engine, SessionLocal, get_db dependency
+│   │   ├── api/router.py     # /api/v1 router
+│   │   ├── core/security.py  # argon2 hashing, JWT create/decode
+│   │   ├── core/token_store.py # Revoked tokens (Redis)
+│   │   ├── api/deps.py       # DbSession, RedisClient, CurrentUser
+│   │   ├── api/permissions.py # require_cargo / require_actividad / require_funcion
+│   │   ├── api/routes/       # health, auth, users, leads, citas, captaciones, dashboard, asesor, preoperacional
+│   │   ├── models/           # User, UserActividad + domain enums
+│   │   ├── schemas/          # Pydantic request/response models
+│   │   ├── services/         # users, leads, citas, captaciones (business rules) + policies, errors
+│   │   └── scripts/          # seed.py (demo users) + seed_leads.py + seed_captaciones.py
+│   ├── alembic/              # Migrations (env.py reads app settings)
+│   ├── tests/
+│   └── pyproject.toml
+└── frontend/
+    ├── nuxt.config.ts        # runtimeConfig.public.apiBase
+    ├── assets/css/tokens.css # Design tokens (CSS variables, light/dark)
+    ├── layouts/default.vue   # Sidebar + content shell
+    ├── plugins/auth.ts       # Auth state, token cookies, authenticated fetch
+    ├── composables/          # useAuth(), useApi()
+    ├── middleware/auth.global.ts # Login required unless page is public
+    ├── layouts/auth.vue      # Centered layout for /login
+    ├── components/UserDrawer.vue # Create / edit user panel + activity history
+    ├── error.vue             # 403 / 404 / error page
+    ├── pages/login.vue
+    ├── pages/index.vue       # Dashboard: cargo, activities, GPS status
+    ├── pages/usuarios/       # User management (Gerencia, Coordinación)
+    ├── pages/leads/          # Atención y Preventa (C01) + lead detail (C02)
+    ├── pages/citas/          # Control de citas (C03)
+    ├── pages/captaciones/    # Verificar captaciones (K12) / Nueva captación (M15) + detail
+    ├── pages/coordinacion.vue # Coordinación / Gerencia · hoy (K01, phone K11)
+    ├── pages/asesor.vue      # Asesor home (M01 / M02)
+    ├── pages/mis-citas.vue   # Asesor's citas: accept, reject, take, close (M03)
+    ├── pages/preoperacional.vue   # Mi preoperacional: realizar hoy + historial y puntaje (M07 / C08)
+    └── pages/preoperacionales.vue # Team review for Coordinación / Gerencia (K09)
+```
+
+## Ports
+
+| Service  | URL                                  |
+|----------|--------------------------------------|
+| Frontend | http://localhost:3000                |
+| API      | http://localhost:8100 (docs at `/docs`) |
+| Postgres | localhost:5432 (user/pass/db: `cdc`) |
+| Redis    | localhost:6379                       |
+
+The API uses port 8100 instead of 8000 so it doesn't clash with other local projects.
+You can override any host port: `API_PORT=8200 POSTGRES_PORT=5433 docker compose up -d`.
+
+## Requirements
+
+- Docker Desktop
+- Node 20+ and pnpm (`npm i -g pnpm`)
+- Python 3.12+ (only if you run the API outside Docker: `brew install python@3.12`)
+
+## 1. Start Postgres + Redis
+
+```bash
+docker compose up -d
+```
+
+## 2. Backend
+
+**Option A: run in Docker (simplest).** This runs migrations, then uvicorn with hot reload:
+
+```bash
+cp backend/.env.example backend/.env
+docker compose --profile api up -d --build
+docker compose exec api python -m app.scripts.seed   # demo users (safe to re-run)
+docker compose logs -f api
+```
+
+**Option B: run in a local virtualenv:**
+
+```bash
+cd backend
+cp .env.example .env
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+alembic upgrade head
+python -m app.scripts.seed
+uvicorn app.main:app --reload --port 8100
+```
+
+Check it:
+
+```bash
+curl localhost:8100/api/v1/health         # liveness
+curl localhost:8100/api/v1/health/ready   # checks Postgres + Redis
+open http://localhost:8100/docs
+```
+
+Tests, lint and migrations (prefix with `docker compose exec api` when using Option A).
+Tests need Postgres running: they create a separate `cdc_test` database from the migrations.
+
+```bash
+pytest
+ruff check . && ruff format --check .
+alembic revision --autogenerate -m "create users"   # after adding a model to app/models/__init__.py
+alembic upgrade head
+```
+
+## 3. Frontend
+
+```bash
+cd frontend
+cp .env.example .env
+pnpm install
+pnpm dev            # http://localhost:3000
+```
+
+Every page needs a login except ones that set `definePageMeta({ public: true })`.
+To limit a page by cargo, use `definePageMeta({ cargos: ['gerencia', 'coordinacion'] })`; anyone else gets a 403 page.
+The dashboard at `/` shows the current user's cargo, activities and GPS check-in status.
+
+Other commands: `pnpm typecheck`, `pnpm build`, `pnpm preview`.
+
+> Use pnpm. `npm install` currently fails on npm 10 with `Cannot read properties of null (reading 'edgesOut')` while resolving Nuxt's peer dependencies.
+
+## Stop / reset
+
+```bash
+docker compose --profile api down        # stop
+docker compose --profile api down -v     # stop and wipe the database
+```
+
+## Design system
+
+The UI follows the approved prototypes (`CDC_Software_Operativo/paginas/*.dc.html`).
+- **Tokens:** `frontend/assets/css/tokens.css` holds the colours, fonts and radii.
+- **Shared classes:** `frontend/assets/css/main.css` uses the **same class names as the prototypes**, so markup can be copied across almost directly:
+
+| Class | Use |
+|-------|-----|
+| `.ttl` | Bebas Neue title (32px, 26px on mobile) |
+| `.lbl` / `.mut` | Small uppercase label / muted text |
+| `.card` (`.card.focus` = 2px green border) | White card, radius 16px |
+| `.btn` + `.bp` / `.bs` / `.br` (`.sm` = 32px) | Primary / secondary / danger button |
+| `.chip` + `.ok` `.warn` `.bad` `.info` `.gray` `.pend` | Status chips |
+| `.act.on1` / `.act.off1` | Active / inactive activity pill |
+| `.in` / `.sel` / `.fld` | Input, select, field with label |
+| `.opt` (`.on`) | Single-choice option button |
+| `.tbl`, `.av`, `.note` (`.ok` `.bad` `.warn`) | Table, 30px avatar, note box |
+
+- **Components:** `PageBar` (white top bar with back link, title and actions), `AppSwitch` (`.sw` toggle), `ConfirmDialog`, `BrandLogo`.
+- **Layout:** desktop has the dark green sidebar (256px); at 760px and below it switches to a white top bar with bottom navigation.
+- **Light theme only**, as in the prototypes.
+
+## Test users
+
+Created by `python -m app.scripts.seed` (refuses to run outside `local`/`test`).
+All share the password **`CasaDolce2026!`** (override with `SEED_PASSWORD`).
+
+| Email                    | Cargo                   | Activities / function      |
+|--------------------------|-------------------------|----------------------------|
+| gerencia@example.com     | Gerencia                | none                       |
+| coordinacion@example.com | Coordinación            | none                       |
+| asesor@example.com       | Asesor                  | Captación + Ventas (GPS on) |
+| bruno@example.com        | Asesor                  | Captación                  |
+| carla@example.com        | Asesor                  | Arriendos                  |
+| diego@example.com        | Asesor                  | Ventas + Arriendos         |
+| preventas@example.com    | Asesor                  | Function: Pre-ventas       |
+| auxiliar@example.com     | Auxiliar administrativa | none                       |
+| atencion@example.com     | Atención al Cliente     | Function: Atención al Cliente |
+
+## Auth
+
+| Endpoint                   | Body                         | Notes |
+|----------------------------|------------------------------|-------|
+| `POST /api/v1/auth/login`  | `{email, password}`          | Returns access + refresh tokens and the user |
+| `POST /api/v1/auth/refresh`| `{refresh_token}`            | Returns a new pair; the old refresh token stops working |
+| `POST /api/v1/auth/logout` | `{refresh_token}` + Bearer header | Revokes both tokens |
+| `GET  /api/v1/auth/me`     | Bearer header                | Current user |
+
+- Access tokens last 15 minutes and refresh tokens 7 days (`JWT_ACCESS_TTL_MINUTES`, `JWT_REFRESH_TTL_DAYS`).
+- Passwords are hashed with argon2id.
+- Revoked tokens are kept in Redis until they would have expired.
+- The user is loaded from the database on every request, so deactivating someone or changing their activities takes effect immediately.
+- The API refuses to start outside `local`/`test` unless `JWT_SECRET` is set to a random value of at least 32 characters.
+- In Swagger (`/docs`), click **Authorize** and paste an access token.
+
+The frontend keeps both tokens in cookies, so server rendering and route middleware can see the session. When an access token expires, it refreshes once and retries the request. A later improvement is to have the API set the refresh token as an `httpOnly` cookie, so page scripts can't read it.
+
+## User management (`/api/v1/users`, Gerencia and Coordinación only)
+
+| Endpoint | Body | Notes |
+|----------|------|-------|
+| `GET  /users` | `?q=&cargo=&is_active=` | List with cargo, activities, funcion |
+| `GET  /users/{id}` | | |
+| `POST /users` | `{email, password, full_name, cargo, funcion?, actividades?, is_active?}` | 201; duplicate email gives 409 |
+| `PATCH /users/{id}` | any of `{full_name, cargo, is_active, funcion}` | Partial; `funcion: null` clears it |
+| `POST /users/{id}/activities` | `{actividades: [...]}` | Replaces the full set |
+| `GET  /users/{id}/activities/history` | | Who switched each activity on or off, and when |
+| `POST /users/{id}/funcion` | `{funcion: "pre_ventas" \| "atencion_cliente" \| null}` | |
+
+Rules (a broken rule returns 422 with a message in Spanish; a permission problem returns 403):
+- A user can have an independent function or commercial activities, not both. Remove one before adding the other.
+- The Atención al Cliente cargo always has the Atención al Cliente function. Moving a user to that cargo sets the function, but fails if they still have activities.
+- Pre-ventas can be assigned to any cargo (for now).
+- Only Gerencia can create, edit or promote to Gerencia users.
+- Nobody can change their own cargo or deactivate themselves.
+- Deactivating a user ends their session on their next request.
+- Every activity switched on or off is logged in `actividad_eventos` with who did it. `user_actividades.granted_by_id` also records who switched on each current activity.
+
+The `/usuarios` page covers all of this: activities and función are edited inline in the table, and creating a user or editing name, cargo or status happens in a side panel that also shows the activity history.
+
+### Permission helpers (`backend/app/api/permissions.py`)
+
+```python
+from app.api.permissions import require_cargo, require_actividad, require_funcion
+
+# Route-level guard
+@router.get("/reportes", dependencies=[Depends(require_cargo(Cargo.GERENCIA, Cargo.COORDINACION))])
+
+# Guard + get the user
+@router.post("/checkin")
+def checkin(user: Annotated[User, Depends(require_actividad(ActividadComercial.CAPTACION))]): ...
+
+# All listed activities required
+require_actividad(ActividadComercial.VENTAS, ActividadComercial.ARRIENDOS, require_all=True)
+```
+
+There's no implicit superuser: if Gerencia should pass a check, list it explicitly.
+
+## Atención y Preventa: leads and citas
+
+Built from prototypes C01 (Atención y Preventa), C02 (Gestionar lead) and C03 (Control de citas), and decisions G-013, G-014, G-044 and G-045.
+
+**Who can use it.** Users with the Atención al Cliente or Pre-ventas function, plus Coordinación and Gerencia. Asesores with only commercial activities, and the Auxiliar administrativa, get 403 and don't see the module in the menu.
+
+**Leads**
+- **Arriving:** leads come in without an owner. «Seguir lead» makes you the only owner, and only Coordinación or Gerencia can reassign it. Atención and Pre-ventas see unassigned leads and their own; managers see all leads.
+- **Stages:**
+  - `nuevo` → `en_gestion`, automatically after the first action.
+  - `seguimiento` while a follow-up is pending.
+  - `cita_programada`, set automatically when a cita is created.
+  - `ganado` (managers only) and `perdido` close and archive the lead. Only managers can reopen it.
+- **Perdido:**
+  - It needs a reason.
+  - «Número equivocado» never costs points.
+  - «No contesta» costs points unless there were at least 3 calls on 3 consecutive days.
+  - A lead with an active cita can't be closed.
+- **History:** every action (call, message, options sent, observation, follow-up, cita, stage change, reassignment) is saved in `lead_eventos` with who did it and when.
+
+**Citas**
+- **Asesor:** an asesor who has the required activity and isn't booked within an hour of the slot.
+- **Status:** `pendiente` (waiting for acceptance) → `aceptada` or `rechazada` → `realizada` or `cancelada`.
+- **Rescheduling** needs a reason, and an accepted cita goes back to `pendiente`.
+- **Needs action:** a cita appears in «Requieren acción» when it was rejected, has no asesor, or is still pending with less than 1 hour to go.
+- **Asesor's answer:** asesores don't have their own screen yet, so Atención or Coordinación record whether the asesor accepted or rejected.
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /leads?etapa=&abiertos=&assigned=me\|none\|<id>&fuente=&desde=&hasta=&q=` | List with filters |
+| `GET /leads/stats?periodo=hoy\|semana\|mes` | KPI row |
+| `GET /leads/responsables` | Managers: who a lead can be assigned to |
+| `POST /leads` · `GET/PATCH/DELETE /leads/{id}` | CRUD (`DELETE` and `assigned_to_id` are for managers only) |
+| `POST /leads/{id}/follow` | «Seguir lead» (409 if someone else already has it) |
+| `POST /leads/{id}/actions` | `{tipo: llamada\|mensaje\|opciones\|observacion, …}` |
+| `POST /leads/{id}/followups` · `…/followups/{sid}/complete` | Schedule a follow-up / mark it done |
+| `POST /leads/{id}/stage` | `{etapa, motivo?}` |
+| `GET /citas?bucket=accion\|pendientes\|aceptadas\|realizadas\|canceladas` | List + per-tab counts |
+| `GET /citas/asesores?tipo=&scheduled_at=` | Who can take the cita and who is free |
+| `POST /citas` · `GET/PATCH /citas/{id}` | Create / read / edit notes |
+| `POST /citas/{id}/status` · `/reassign` · `/reschedule` | Status flow |
+
+**Demo data.** `python -m app.scripts.seed` also creates 14 leads and 5 citas (only if there are no leads yet), covering every stage: four new leads without an owner, follow-ups due today, a rejected cita, a cita starting in under an hour, and one lead each archived as perdido and ganado. Log in as `atencion@`, `preventas@` or `coordinacion@` to see them. To reset them:
+`docker compose exec db psql -U cdc -d cdc -c "TRUNCATE lead_eventos, lead_seguimientos, citas, leads RESTART IDENTITY CASCADE"`, then run the seed again.
+
+## Captaciones
+
+Built from prototypes K12 (Verificar captaciones, Coordinación and Gerencia) and M15 (Nueva captación, asesor), and the decision «Captaciones · registro rápido y verificación».
+
+**Who can use it.** People with the **Captación** activity register captaciones and see only their own. Coordinación and Gerencia see all of them, verify them and can register one on behalf of a captador. Everyone else gets 403 and doesn't see the module in the menu. If Coordinación switches off someone's Captación activity, the module closes for them at once.
+
+**Rules**
+- **Two ways to register:** «Registro rápido» (venta or arriendo, property code, address) or «Formulario completo» (also property type, barrio, municipio, price or rent, owner and phone are required; area, rooms, bathrooms, parking and notes are optional).
+- **Duplicate codes:** a property code can be in only one live captación («Inmueble ya registrado», 409). A partial unique index enforces this in the database, so two people submitting at once can't both succeed. Rejected captaciones don't block their code.
+- **Verification:** every captación arrives `por_verificar`. Coordinación or Gerencia approve it, or reject it with a reason («código inexistente» or «el código no corresponde a esa dirección») plus an optional note. Only approved captaciones count.
+- **Correcting:** «Corregir y volver a enviar» updates the same rejected captación; the code or address must change, and it goes back to `por_verificar`.
+- **Published:** approved captaciones can be marked «Publicada».
+- **Editing:** the captador can edit until it's approved and can withdraw it while it's `por_verificar`. Managers can always edit, reassign (only to someone with Captación) and delete.
+- **GPS:** the browser's location is recorded only when captadores submit their own captación. Distance to the address needs geocoding, which isn't set up yet.
+- **History:** every submission, edit, approval, rejection, resubmission, publication and reassignment goes into `captacion_eventos`.
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /captaciones?estado=&asesor_id=&negocio=&publicada=&desde=&hasta=&q=` | `{items, counts, aprobacion_pct}` |
+| `GET /captaciones/captadores` | Managers: who can own a captación |
+| `POST /captaciones` · `GET/PATCH/DELETE /captaciones/{id}` | CRUD (`asesor_id` on create is for managers only) |
+| `POST /captaciones/{id}/status` | `{estado: aprobada\|rechazada, motivo?, observacion?}` (managers) |
+| `POST /captaciones/{id}/resubmit` | `{codigo_inmueble, direccion}`, rejected only |
+| `POST /captaciones/{id}/publish` · `/reassign` | Mark published / change owner (managers) |
+
+**Demo data.** The seed adds `bruno@example.com` (Captación) and 9 captaciones: 4 por verificar (one corrected and resubmitted), 3 aprobadas (2 published) and 2 rechazadas, split between `asesor@` and `bruno@`. To reset them: `TRUNCATE captacion_eventos, captaciones RESTART IDENTITY CASCADE`, then run the seed again.
+
+## Coordinación dashboard (`/coordinacion`)
+
+Built from prototypes K01-DashCoord (desktop) and K11-CoordCel (phone). Coordinación and Gerencia land here after logging in (and the sidebar's «Inicio» takes them here); everyone else gets 403 and keeps their own home page. The page refreshes itself every minute.
+
+- **KPI cards:** leads without an owner (and how many have waited more than 15 min), citas not yet accepted (and how many start within the hour), rejected citas, captaciones por verificar (and the oldest one), today's citas, and open leads split into venta and arriendo.
+- **Summary cards:** this month's captaciones with a traffic-light chip (green ≥ 80 %, yellow 60–79 %, red < 60 %), and this month's leads (won, lost, lost with a penalty).
+- **Mi equipo hoy:** one row per person: citas not yet accepted (red when within 1 hour), today's citas, overdue follow-ups, citas needing action, captaciones to correct.
+- **Mi equipo · actividades:** C/V/A pills, GPS, captaciones approved this month (venta/arriendo), how many are waiting for verification, citas done and accepted. «No aplica» means the person doesn't have that activity.
+- **Alertas en tiempo real:** most urgent first, built from live data, each with a link. On the phone each alert also has «Qué hacer».
+- **Atención y Preventa:** leads followed, first response (average minutes from a lead arriving to someone taking it), calls, follow-ups on time (marked done within 30 min of their time), citas scheduled and done, leads won and open leads.
+
+The prototype's tasks, pedidos, GPS alerts, preoperacional, attendance and rendimiento come from modules that don't exist yet, so they aren't shown. The tables leave room to add them.
+
+| Endpoint | Content |
+|----------|---------|
+| `GET /dashboard/coordinacion` | Everything above in one request |
+| `GET /dashboard/leads` · `/citas` · `/captaciones` · `/equipo` | One section each |
+
+All of them are grouped queries over the existing tables. Coordinación and Gerencia only.
+
+## Asesor home (`/asesor`) and «Mis citas» (`/mis-citas`)
+
+Built from prototypes M01-Asesor1 and M02-Asesor2 (home) and M03-Citas. Asesores (at least one of Captación, Ventas or Arriendos) land on `/asesor` after logging in. The menu shows only what they can use: Inicio and Mis citas, plus Captaciones if they have Captación. Coordinación and Gerencia can open any asesor's home read-only from the team table on their dashboard (`/asesor?asesor=<id>`). Atención and the Auxiliar get 403.
+
+**Home**
+- **Mis pendientes y recordatorios** (most urgent first): citas to accept; citas another asesor rejected that this asesor can take (they have the activity and are free at that time); citas to close after the visit; reminders for citas within 1 hour or tomorrow; and, for captadores, rejected captaciones to correct and approved ones to mark published.
+- **Today's citas** and **Mis actividades** (with GPS only if they have Captación).
+- **Mis resultados del mes:** one tab per active activity. Captación: approved for venta and arriendo, por verificar, published. Ventas and Arriendos: citas, done, upcoming accepted, still to answer.
+- **Quick actions:** Nueva captación (captadores only), Mis citas.
+
+**Mis citas (M03)** has four tabs: Por responder, Próximas, Por cerrar and Cerradas. The asesor can:
+- **Accept** a cita.
+- **Reject** it, with a reason from the list plus a note.
+- **Take** a cita another asesor rejected («El asesor ha rechazado esta cita. ¿Deseas tomar esta cita?»). The first one to take it keeps it; this is safe even if two people try at once.
+- **Close** it after the visit, saying what happened.
+
+Everything is recorded in the lead's history. Atención and Coordinación can still record an asesor's answer from Control de citas.
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /asesor/inicio?asesor_id=` | Home (`asesor_id` for managers only) |
+| `GET /asesor/citas?asesor_id=` | The four lists + counts |
+| `POST /asesor/citas/{id}/aceptar` · `/rechazar` · `/tomar` · `/cerrar` | Only the asesor (managers can't do these for them) |
+
+The prototype's entrada/GPS, preoperacional, negocios, pedidos, rendimiento %, goals and pagos depend on modules that don't exist yet, so they aren't shown; the goal appears as «pendiente de configuración».
+
+## Preoperacional (`/preoperacional`, `/preoperacionales`)
+
+Built from prototypes M07 (phone), C08 (desktop, all cargos) and K09 (team review), and decisions G-007, G-008, G-012 and «Preoperacional según medio de transporte».
+
+- **Who:** everyone does it, all cargos including Gerencia, with the same form, once per day (Bogotá date). Gerencia can switch it off per cargo; Coordinación sees that setting read-only. When it's off there is no reminder, and it neither counts nor lowers the score. The history is kept.
+- **Form:** Carro or Moto need a plate and the 8 official SÍ/NO questions (a different list for each). Bicicleta, Transporte público, A pie and Otro are a travel report only. «Observaciones y novedades» is optional. Name, date and time are saved automatically.
+- **Novedad:** any NO, or an observation, is a novedad. Coordinación and Gerencia mark it as reviewed, with an optional note.
+- **Who sees whose:** Coordinación sees Asesores, Atención / Pre-ventas and the Auxiliar. Coordinación's own goes to Gerencia. Gerencia sees everyone.
+- **Score (automatic):** based on business days (Mon–Fri) completed from the person's start, and today counts only once it's done. 100 % = 5 · 90–99 % = 4 · 80–89 % = 3 · 70–79 % = 2 · < 70 % = 1. A score of 2 or 1 costs 5 points. Gerencia's is a record only.
+- **Where it shows up:**
+  - **Asesor home and general home:** the M01 banner «ATENCIÓN: debes realizar el preoperacional» until it's done, then a green chip.
+  - **Coordinación dashboard:** a «Preoperacional x/y» card, a column in «Mi equipo hoy», the phone tile, and alerts for people who haven't done it and novedades not yet reviewed.
+- **Download:** a month (or one person's month) as CSV, which opens in Excel.
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /preoperacional/formulario` | Means of transport, questions, today's record, who receives it |
+| `POST /preoperacional` | `{medio, placa?, respuestas?: [8 × bool], observaciones?}` (409 if already done today) |
+| `GET /preoperacional/mios?mes=AAAA-MM` | Calendar, score, novedades, missed days |
+| `GET /preoperacional/equipo?fecha=` | K09: one day for everyone you review + the month's score |
+| `POST /preoperacional/{id}/revisar` | `{nota?}` |
+| `GET /preoperacional/config` · `PUT /preoperacional/config/{cargo}` | On/off per cargo (changes: Gerencia only) |
+| `GET /preoperacional/export.csv?mes=&user_id=` | Coordinación / Gerencia |
+
+**Demo data.** About 30 business days of history for every demo user (so last month has numbers too), with a few missed days and novedades (older ones already reviewed). Today Bruno has a novedad (brakes) and Asesor Demo hasn't done it yet. To reset: `TRUNCATE preoperacionales`, then run the seed again.
+
+## Pedidos (`/pedidos`)
+
+What a client is looking for (prototypes K06, K06-ger, M06, C10). Codes start at `PED-030`.
+
+- **Who**: asesores with a commercial activity, Atención al Cliente / Pre-ventas, Coordinación and
+  Gerencia. Auxiliar gets 403. Anyone allowed can create one, for themselves or for another person.
+- **States**: `abierto` → `atendido` or `perdido` (with reason). The screen also shows derived states:
+  Nuevo, Urgente, Vence hoy, Vencido · sin decidir, Recuperado (attended after it expired).
+- **Expired pedidos are never lost automatically.** The responsable or Coordinación either extends the
+  date (with a reason; only allowed once it has expired) or marks it lost. Expired ones stay in
+  «Vencidos» for Gerencia.
+- **Duplicates**: if the client (lead, phone digits or name) already has an open pedido, creation returns
+  409 and the form offers «Actualizar PED-xxx» or «Es otra necesidad».
+- **Changes**: only the responsable or a manager can update, attend or lose a pedido. Updates need
+  «¿Qué cambió?», and the history keeps the before and after. Others can propose a property or comment.
+  Only managers reassign.
+- **Screens**: managers get KPIs, the team table and the «Vencidos» tab. Asesores and Atención get cards
+  with «Mis pedidos» and the team's pedidos, plus filters for negocio, presupuesto, zona and
+  «Próximos a vencer» (3 days).
+- **Elsewhere**: the asesor home shows pedidos due today, expired or about to expire. The Coordinación
+  dashboard has a «Pedidos vencidos» KPI, a «Pedidos por vencer» column and alerts for undecided ones.
+
+Endpoints: `GET/POST /pedidos`, `GET /pedidos/opciones`, `GET/PATCH /pedidos/{id}`,
+`POST /pedidos/{id}/extender|atendido|perdido|proponer|comentar|reasignar`.
+
+## Rendimiento (`/resultados`, `/equipo`, `/rendimiento`, `/rendimiento-empresa`)
+
+The month's result for each person (prototypes M08, C04, K14, K07, K18, G12). Everything is calculated
+from data already in the system; nothing is entered by hand except weights, goals and the 1–5 ratings.
+The rules are in the docstring of `backend/app/services/rendimiento.py`.
+
+**Who has a result**: asesores (with a commercial activity), Atención y Preventa, and the Coordinador.
+Gerencia and the Auxiliar don't have indicators yet (PENDIENTE DE CONFIGURACIÓN).
+
+**How it's calculated**
+- Result = Σ (cumplimiento × weight) + adjustments − deductions, shown from 0 to 100. One point is 1 %.
+- Cumplimiento = achieved ÷ goal, capped at 100 %. An area «cumple» at 100 %.
+- Areas with no data (their module doesn't exist yet, or nothing to measure) don't count. The result
+  uses the weight of the areas that have data, and the screen says so («calculado sobre el 65 %»).
+- 1–5 ratings have no weight: each 2 or 1 takes off 5 points. The preoperacional rating comes from
+  the preoperacional module. Puntualidad has no data until «Marcar entrada» exists.
+- Atención y Preventa: +1 per lead ganado; −0.5 per lead perdido that «descuenta» (wrong numbers, and
+  no contact after 3 calls on 3 days, don't).
+- Traffic light: verde 80–100 · amarillo 70–79 · naranja 60–69 · rojo < 60.
+
+**What counts in each area**
+
+| Who | Area | Counts | Default goal / weight |
+|---|---|---|---|
+| Asesor | Ventas / Arriendos | Leads of that type marked «Ganado» this month whose last realized visit was with this asesor | 1 venta · 3 arriendos |
+| Asesor | Captación | Captaciones approved this month (rejected ones don't count) | 10 |
+| Asesor | weights | 1 activity 100 · 2 → 50/50 · 3 → 50/30/20 (Ventas, Arriendos, Captación) | |
+| Atención | Leads gestionados · Llamadas | Distinct leads with an action by them · calls they logged | 30 · 45 |
+| Atención | Seguimientos a tiempo | Follow-ups due this month, done ≤ 30 min late (cancelled ones excluded) | 100 % |
+| Atención | Citas programadas / realizadas | Client citas they scheduled this month (not control visits or inventories) / of those, realized | 12 · 10 |
+| Atención | Conversión · Cierres | Citas ÷ leads gestionados · leads ganados assigned to them | 40 % · 5 |
+| Coordinador | Resultados del equipo | Average result of asesores and Atención | weight 50 |
+| Coordinador | Monitoreo y seguimiento | Captaciones of the month verified within 24 h (more criteria pending) | weight 15 |
+| Coordinador | Plataformas · Rutas | No data until those modules exist | weights 20 · 15 |
+
+**Avoiding double counts**: a won lead counts once for the asesor of its last realized visit (Ventas
+or Arriendos) and once for the Atención person it's assigned to (Cierres). These are different
+indicators, as in the prototype. A captación counts once, when it's approved.
+
+**Who configures what** (every change goes to `rendimiento_cambios` with before and after):
+- Weights must add up to exactly 100 and apply from this month. Goals apply from next month, so this
+  month keeps the goals it started with.
+- Asesores' weights and goals: Coordinación or Gerencia. Atención's and the Coordinador's: Gerencia.
+- Ratings for asesores and Atención: Coordinación only (Gerencia and the Auxiliar consult). Ratings
+  for the Coordinador: the Auxiliar or Gerencia. Nobody rates themselves, and only the current month
+  can be rated.
+
+**Who sees what**: everyone sees their own result («Mis resultados», with a «Puntaje» tab on mobile
+and a card on the asesor home). Coordinación sees asesores and Atención in «Mi equipo». Gerencia and
+the Auxiliar also see the Coordinador. «Rendimiento de la empresa» (Gerencia only) averages each area
+and the company, compares with last month, and flags areas under 60 %.
+
+Endpoints: `GET /rendimiento/mio`, `/equipo`, `/equipo.csv`, `/empresa`, `/personas/{id}`,
+`/config/{id}`, `/cambios/{id}` (all take `?periodo=AAAA-MM`), plus `PUT /config/{id}/pesos`,
+`PUT /config/{id}/metas` and `PUT /calificaciones/{id}`.
+
+The demo seed (`seed_rendimiento`) creates a month of work, plus last month, so the screens show
+numbers close to the prototype's.
+
+## Compensación (`/mis-pagos`, `/compensacion`, `/salarios`)
+
+Commissions, bonuses, payments and salaries (prototypes G05, G05-aux, X04, Z05, M12–M14). The rules
+are in the docstring of `backend/app/services/compensacion.py`. **Every percentage, amount and date
+is an example value** that Gerencia edits in «Configuración», because the prototypes mark them
+«PENDIENTE DE CONFIGURACIÓN».
+
+**Trigger: closed deals (`NEG-0140…`)**: one is created for each lead marked «Ganado». The system
+works out who took part:
+- *cerrador*: the asesor of the lead's last completed visit
+- *filtro*: the Atención y Preventa person the lead is assigned to
+- *captador*: chosen by the Auxiliar or Gerencia (leads aren't linked to captaciones yet)
+
+If the lead stops being «Ganado», the deal becomes «caído» and its unpaid commissions are cancelled.
+
+**Ganancia efectiva**: there are no deal amounts in the system yet, so the Auxiliar or Gerencia enters
+what the company keeps from the deal (after colleagues and referrals, without IVA) in «Negocios
+cerrados». Commissions are generated at that moment.
+
+| Who | What | Example rule |
+|---|---|---|
+| Asesor who closed | Commission | ganancia × 33.3 % × 70 % |
+| Asesor who got the property | Commission | ganancia × 33.3 % × 30 % (not paid if there's no captador) |
+| Atención y Preventa | Commission for a cita that ended in a deal | ganancia × 5 % |
+| Coordinador | Group commission | 2.5 % of the team's ganancia, when the month reaches $20.000.000 |
+| Everyone with a result | Performance bonus | $200.000 if the month's Rendimiento is ≥ 80 % (Coordinador: per «modalidad») |
+
+Bonuses and the group commission are calculated with «Calcular bonos de …» once the month has ended.
+Running it twice doesn't duplicate anything. Gerencia and the Auxiliar can also record a commission
+or bonus by hand.
+
+**Approval flow** (G05): Generada → «Dar visto bueno» (Auxiliar only) → «Aprobar» (Gerencia only).
+Approving schedules a payment «en proceso» for the 5th of the next month. Then «Registrar pago»
+(Gerencia) marks it Pagada. Before approval, either of them can «Ajustar» the amount (needs a
+reason, and goes back to Generada for a new visto bueno). Either can «Anular» with a reason. Every
+step is in the «Historial» (`compensacion_eventos`).
+
+**Salaries** (X04): Gerencia sets each person's monthly salary. Each pay period is half of it (paid
+on the 15th and the 30th). The Auxiliar «Confirmar a pagar», and Gerencia «Aprobar y pagar», which
+creates the payment. Incapacidades and permisos no remunerados from «Ausencias y permisos» are
+discounted automatically (see Novedades below). There are no other deductions yet.
+
+**Who sees what**:
+- Everyone sees their own pay in «Mis pagos y bonos» (Z05 table on desktop, M12–M14 cards on mobile;
+  asesores also reach it from «Mis resultados»).
+- The Auxiliar and Gerencia see and manage everything.
+- **Coordinación sees only its own**, following DECISIONS (pay data is outside Coordinación's scope).
+
+**Simplifications** (to revisit when the related modules exist):
+- No deals module: the trigger is the lead «Ganado», and the ganancia is entered by hand.
+- No partial commission payments for sales.
+- No clock-in yet: hours worked don't change the salary, and «Horas trabajadas» (X03) and
+  «Valor y productividad» (G08) aren't built. Absences do (Novedades).
+- No legal deductions (salud, pensión) or auxilio de transporte.
+- «Excel» downloads are CSV, and there's no PDF certificate yet.
+
+Endpoints:
+- `GET /compensacion/mio`, `GET /compensacion` (G05 board), `GET /compensacion/export.csv?tab=`
+- `POST /compensacion/{comisiones|bonos}` and `/{comisiones|bonos}/{id}/accion`
+- `POST /compensacion/pagos/{id}/pagar`, `PUT /compensacion/cierres/{id}`
+- `POST /compensacion/calcular?periodo=`, `PUT /compensacion/config`, `GET /compensacion/historial/{entidad}/{id}`
+- `GET /compensacion/salarios?periodo=&corte=`, `POST /compensacion/salarios/accion`,
+  `PUT /compensacion/salarios/config/{user_id}`
+
+The demo seed (`seed_compensacion`) sets salaries, registers the ganancia of every deal except the two
+newest, takes last month through to payment (including bonuses and the group commission), leaves
+this month in a mix of states, and pays the salary periods whose day has passed.
+
+## Inmuebles (`/inmuebles`)
+
+The property catalog. Rules are in `backend/app/services/inmuebles.py`.
+
+**Prototype note**: X14 is «Administración de inmuebles» (move-in/move-out inventories, repairs,
+owner and tenant requests), not a catalog, and no prototype has a catalog screen. So:
+- The page borrows X14's layout: KPI cards that filter, tabs, a filter row, and cards that expand
+  to show details and history.
+- The fields come from the full captación form (M15).
+- «Enviar opciones» follows C02.
+- X14's operations (inventories, repairs, complaints) are their own page:
+  «Administración de inmuebles» below.
+
+**Where properties come from**: when Coordinación approves a captación, its property is created
+with the same code, or an existing one with that code is linked and its empty fields are filled.
+The captación and its captador are recorded. A quick captación (only code and address) makes a
+property with «datos incompletos». Coordinación and Gerencia can also register one by hand. A code
+with a captación still «por verificar» is refused, because approving it creates the property.
+
+**Statuses** (none are defined in the prototypes, so these are a simplification):
+- disponible → separado → arrendado (rentals) or vendido (sales), or retirado
+- Separado and retirado need a note.
+- Only Coordinación and Gerencia change the status.
+- Only «disponible» properties can be offered to a client.
+
+**Who**:
+- Asesores, Atención y Preventa, the Auxiliar, Coordinación and Gerencia see the catalog.
+- The owner's name and phone are only shown to Coordinación, Gerencia, the Auxiliar and the
+  property's captador.
+- The captador can complete the data of their properties («Mis captaciones» tab), but not the
+  code, business type or status.
+- New properties come from «Nueva captación». Registering by hand is only for Coordinación and
+  Gerencia.
+- Deleting is only for properties registered by hand and never sent to a client. The rest are
+  «retirado».
+
+**Filters**: negocio, tipo, zona (same list as pedidos), price range (same ranges as pedidos), at
+least N bedrooms, «datos incompletos», and text (code, address, barrio, municipio).
+
+**Used elsewhere**:
+- Lead «Enviar opciones» (C02): pick available properties of the lead's business type, with the
+  lead's zone first and «Ya enviado» on those already sent. The lead's history lists the codes, and
+  each property's history records which client it was sent to.
+- Pedido «Proponer un inmueble»: pick from the catalog, or keep typing freely.
+
+**Simplifications**:
+- A closed deal doesn't change the property's status automatically, because leads and citas aren't
+  linked to a property yet (the cita's «inmueble» is still free text).
+- No photos.
+
+Endpoints:
+- `GET /inmuebles` (filters and KPIs), `GET /inmuebles/opciones`, `POST /inmuebles`
+- `GET`, `PATCH`, `DELETE /inmuebles/{id}`, `POST /inmuebles/{id}/estado`
+- `GET /inmuebles/para-lead/{lead_id}`
+
+The seed (`seed_inmuebles`) registers the codes the prototypes use in different statuses, brings
+in every approved captación, and has captadores complete most quick ones (a few stay incomplete).
+
+## Administración de inmuebles (`/inmuebles/administracion`, X14)
+
+Inventories, repairs, and owner / tenant requests, each linked to a property in the catalog.
+Rules are in `backend/app/services/administracion.py`. The page follows X14: six KPI cards that
+pick the tab (and its status filter), three tabs, «Desde / Hasta / Estado» filters, a «nuevo» form
+and cards that expand. The catalog links to it, filtered to one property
+(`?inmueble=<id>`, «Inventarios y reparaciones» on each card).
+
+**Inventarios (INV-xxx)**: «Entrega al inquilino» or «Recepción al terminar».
+- programado → realizado (the asesor checked a room) → firmado, or «con novedades» if a room is
+  regular / malo.
+- A new inventory has X14's eight rooms. Each one gets bueno / regular / malo, a note (required
+  for regular and malo) and a photo count.
+- Signing needs every room checked. After that the inventory is locked.
+- «Crear solicitud de reparación con las novedades» makes one repair from the findings, only once.
+- Only a «programado» inventory can be rescheduled or deleted.
+
+**Reparaciones (MAN-xxx)**: recibida → cotizada → aprobada → en ejecución → terminada.
+- Leaving «recibida» needs a provider and a quote, and «terminada» needs to know who pays.
+- After «terminada» the repair is locked. Its time is counted from the report date to the end date.
+- «Registrar avance» logs provider, amount, who pays and a comment.
+- Only a «recibida» repair can be deleted.
+
+**Solicitudes (PQR-xxx)**: petición / queja / reclamo / sugerencia, from the owner or the tenant,
+with channel and priority.
+- abierta → en trámite → respondida (by sending the answer) → cerrada.
+- Closing a request with no answer needs a reason.
+- The deadline is **15 business days** (`PLAZO_DIAS_HABILES`). An open request past it shows as
+  «Fuera de plazo» (in red, with its own KPI and filter).
+
+**Who**:
+- Coordinación, Gerencia and the Auxiliar see and manage everything: they schedule, assign,
+  change statuses, register signatures and delete.
+- Anyone else who can see the catalog (asesores, Atención y Preventa) sees **only the records
+  assigned to them** and works on them. The asesor fills in their inventory, the person following
+  a repair logs progress, and the person in charge of a request answers it.
+- Other people's records return 404. The KPIs count only what the user can see.
+- A property with any of these records can't be deleted from the catalog: it's «retirado».
+- Each record keeps its history, and the property's history shows the main steps.
+
+**Simplifications** (X14 marks several of these «PENDIENTE DE CONFIGURACIÓN»):
+- **Photos are a count per room**. There's no file upload yet.
+- Signatures are one action by the Auxiliar / Coordinación / Gerencia («firmado por propietario e
+  inquilino»), not a digital signature. There's no inventory document (acta) yet.
+- X14's «avance» is one free-text field that the prototype parses. Here it's a small form (provider,
+  amount, who pays, comment).
+- Repair statuses can be set in any order (as in X14), except for the two checks above.
+- When the owner pays, there's no automatic discount in their settlement, no management % and no
+  hand-off to the financial software.
+- Providers are free text: there's no provider list.
+- No notifications: X14 alerts Gerencia about urgent repairs and late requests. Here they're
+  only highlighted in red.
+- Business days are Monday to Friday, without Colombian public holidays.
+- Responsables can be anyone active who can see the catalog, plus the Auxiliar and managers.
+
+Endpoints (`/api/v1/administracion-inmuebles`):
+- `GET /resumen` (KPIs, properties, responsables, labels)
+- `GET|POST /inventarios`, `GET|PATCH|DELETE /inventarios/{id}`,
+  `PATCH /inventarios/{id}/ambientes/{ambiente_id}`, `POST /inventarios/{id}/firmar`,
+  `POST /inventarios/{id}/reparacion`
+- `GET|POST /reparaciones`, `GET|PATCH|DELETE /reparaciones/{id}`,
+  `POST /reparaciones/{id}/avance`, `POST /reparaciones/{id}/estado`
+- `GET|POST /solicitudes`, `GET|PATCH|DELETE /solicitudes/{id}`,
+  `POST /solicitudes/{id}/responder`, `POST /solicitudes/{id}/estado`
+- The lists take `desde`, `hasta`, `estado` (`fuera_de_plazo` for requests) and `inmueble_id`.
+
+The seed (`seed_administracion`) adds X14's example records with dates relative to today:
+- inventories: one with findings (already turned into a repair), one clean, two this week;
+- repairs at every stage;
+- requests: open, late, answered, and one assigned to `asesor@example.com`.
+
+## Novedades: ausencias y permisos (`/novedades`, K13)
+
+**Prototype note**: K13 «Novedades» is about the **staff**: absences and permits per employee, plus
+a tab for the novedades reported in the preoperacional. It has no leads, captaciones, inmuebles,
+priority or assignment, so those aren't part of this module.
+
+Rules are in `backend/app/services/novedades.py`.
+
+**Incapacidades y permisos** (tab 1):
+- Types: incapacidad, permiso no remunerado, permiso remunerado.
+- Each one has an employee, «desde» and «hasta», a note, and a supporting-document count.
+- Days are calendar days, both ends included («1 y 2 oct» = 2 días).
+- One person can't have two registered novedades on the same days, and one novedad can't pass 180
+  days.
+- Statuses: «registrada», or «anulada» (needs a reason). An annulled one stays on record, hidden
+  unless «Ver anuladas» is on, and stops counting.
+- Only the note and attachments can be edited. Wrong dates or type: annul it and register it again.
+- Three cards: days of each type inside the «Desde / Hasta» range (this month by default).
+- The table shows Empleado, Tipo, Fechas, Días, Observación and Registro. Click a row for the
+  details and actions. Filters: type, employee, «Ver anuladas».
+
+**Salary** («Salarios del mes»):
+- Incapacidad and permiso no remunerado are discounted at salario mensual ÷ 30 per day, in the pay
+  period(s) they fall in (1–15 and 16–end of month). The discount is capped at the period's salary.
+- The period's «Novedades» column shows a summary, e.g. «Permiso no remunerado 2 días · Permiso
+  remunerado 1 día». The paid permit is only counted.
+- Only periods «por confirmar» change: registering, annulling or a new salary recalculates them.
+- A period already confirmed by the Auxiliar or paid by Gerencia isn't touched. The response
+  warns about it («ajústalo a mano»).
+
+**Del preoperacional** (tab 2): the preoperacionales with a novedad in the range, with «Por revisar»
+or «✓ Revisada». «Marcar como revisada» uses the existing `POST /preoperacional/{id}/revisar`, with
+the same rules as K09: Coordinación reviews its team, Gerencia reviews everyone, the Auxiliar only
+views.
+
+**Who**:
+- Coordinación and the Auxiliar register and annul.
+- Gerencia sees everything but doesn't register (as in K13, where Gerencia receives them).
+- Nobody else opens the page. Employees see their discount in «Mis pagos y bonos».
+
+**Navigation**:
+- Sidebar «Ausencias y permisos»: in EQUIPO for Coordinación and Gerencia, in PERSONAL for the
+  Auxiliar.
+- «Ausencias» in the Auxiliar's bottom nav.
+- A card on the Coordinación / Gerencia dashboard, since their bottom nav is full.
+
+**Simplifications**:
+- Supporting documents are a count; there's no file upload yet.
+- No notifications: K13 says «le avisa a Gerencia». Here Gerencia sees the novedades on this page,
+  and the «Registro» column shows who registered each one and when.
+- Incapacidades are discounted as K13 says. The EPS / ARL reimbursement and its rules (who pays from
+  which day) aren't modelled.
+- No «Asistencia del día» (K17) yet, so the top button goes to «Salarios del mes» (Gerencia,
+  Auxiliar) or «Preoperacionales» (Coordinación).
+- K13's «Del preoperacional» also lists people who didn't do it today. That stays in
+  «Preoperacionales» (K09).
+
+Endpoints (`/api/v1/novedades`):
+- `GET /opciones` (types, help text, employees, default range)
+- `GET ?desde=&hasta=&tipo=&empleado_id=&anuladas=` (list, days per type, preoperacional novedades
+  to review)
+- `POST` (returns `avisos` for confirmed / paid periods)
+- `GET|PATCH /{id}` (note and attachments only)
+- `POST /{id}/anular` (`{motivo}`)
+- `GET /preoperacional?desde=&hasta=`
+
+The seed (`seed_novedades`) registers K13's example rows this month. It adds one more permiso no
+remunerado on the 20th–21st, so an unconfirmed period shows a discount, and one annulled by
+mistake.
+
+## Business rules
+
+- **Cargo** defines a person's general profile: Gerencia, Coordinación, Asesor, Auxiliar administrativa, Atención al Cliente.
+- **Commercial activities** (Captación, Ventas, Arriendos) are switched on per person and stored in `user_actividades`, which records who granted each one. Coordinación will change them through `services.users.set_actividades`.
+- **Atención al Cliente** and **Pre-ventas** are independent functions (`users.funcion`) and can't be combined with commercial activities. This is checked in the service and backed by a database trigger. The Atención al Cliente cargo always has the Atención al Cliente function (a check constraint enforces it).
+- **GPS / check-in** applies only when Captación is active (`gps_checkin_enabled` on the user).
+
+## Deployment (later)
+
+Planned target: AWS App Runner or ECS Fargate for the API (`backend/Dockerfile`) and RDS PostgreSQL, plus ElastiCache Redis if needed.

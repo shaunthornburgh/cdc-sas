@@ -1,0 +1,757 @@
+/*
+ * Shared components. Class names match the approved prototypes (.dc.html) so screens
+ * can be ported from them directly: .card .lbl .mut .chip .btn .bp .bs .br .in .sel
+ * .fld .tbl .av .note .sw .opt .act .on1 .off1 …
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--cdc-bg);
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--cdc-text);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--cdc-green);
+}
+a:hover {
+  color: #005f2c;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cdc-green);
+  outline-offset: 2px;
+}
+
+/* ---- Type ----------------------------------------------------------------- */
+
+.ttl {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: var(--cdc-text);
+  margin: 0;
+}
+.lbl {
+  font-size: 11px;
+  color: var(--cdc-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.mut {
+  color: var(--cdc-muted);
+}
+.kn {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.req {
+  color: var(--cdc-bad);
+}
+
+/* ---- Layout helpers ------------------------------------------------------- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.g4,
+.g3,
+.g2 {
+  display: grid;
+  gap: 14px;
+}
+.g4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.g3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.g2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wrap {
+  overflow-x: auto;
+}
+@media (max-width: 1100px) {
+  .g4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .g4,
+  .g3,
+  .g2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- Card / note ---------------------------------------------------------- */
+
+.card {
+  background: var(--cdc-card);
+  border: 1px solid var(--cdc-border);
+  border-radius: var(--radius-card);
+  padding: 18px;
+}
+.card.focus {
+  border: 2px solid var(--cdc-green);
+}
+.note {
+  background: var(--cdc-bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--cdc-muted);
+}
+.note.ok {
+  background: var(--cdc-ok-bg);
+  color: var(--cdc-ok);
+}
+.note.bad {
+  background: var(--cdc-bad-bg);
+  color: #7a1f14;
+}
+.note.warn {
+  background: var(--cdc-warn-bg);
+  color: #5c3b00;
+}
+
+/* ---- Chips ---------------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ok {
+  background: var(--cdc-ok-bg);
+  color: var(--cdc-ok);
+}
+.warn {
+  background: var(--cdc-warn-bg);
+  color: var(--cdc-warn);
+}
+.bad {
+  background: var(--cdc-bad-bg);
+  color: var(--cdc-bad);
+}
+.info {
+  background: var(--cdc-info-bg);
+  color: var(--cdc-info);
+}
+.gray {
+  background: var(--cdc-gray-bg);
+  color: var(--cdc-gray);
+}
+.pend {
+  background: var(--cdc-pend-bg);
+  color: var(--cdc-pend);
+}
+
+/* Activity pills: active (on1) / inactive (off1). */
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+.on1 {
+  background: var(--cdc-green);
+  color: #fff;
+}
+.off1 {
+  background: var(--cdc-gray-bg);
+  color: var(--cdc-disabled);
+  text-decoration: line-through;
+}
+
+/* ---- Buttons -------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: var(--radius-btn);
+  font-weight: 700;
+  font-size: 13.5px;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn.sm {
+  min-height: 32px;
+  padding: 0 10px;
+}
+.bp {
+  background: var(--cdc-green);
+  color: #fff;
+}
+.bp:hover {
+  background: var(--cdc-green-hover);
+  color: #fff;
+}
+.bs {
+  background: #fff;
+  color: var(--cdc-green);
+  border: 1.5px solid var(--cdc-green);
+}
+.br {
+  background: #fff;
+  color: var(--cdc-bad);
+  border: 1.5px solid var(--cdc-bad);
+}
+.btn:disabled,
+.btn.dis {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Back button in the top bar. */
+.back {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cdc-input-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cdc-text);
+  text-decoration: none;
+  flex: none;
+  background: #fff;
+}
+.back:hover {
+  border-color: var(--cdc-green);
+  color: var(--cdc-green);
+}
+
+/* Option buttons (single choice). */
+.opt {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cdc-input-border);
+  background: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--cdc-text);
+  cursor: pointer;
+  padding: 6px 12px;
+}
+.opt.on {
+  border-color: var(--cdc-green);
+  background: var(--cdc-green);
+  color: #fff;
+}
+.opt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Forms ---------------------------------------------------------------- */
+
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fld > label,
+.fld > .fld-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.in,
+.sel {
+  min-height: 42px;
+  border: 1.5px solid var(--cdc-input-border);
+  border-radius: 10px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fff;
+  color: var(--cdc-text);
+  width: 100%;
+}
+.sel {
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 13.5px;
+  width: auto;
+}
+.in:focus,
+.sel:focus {
+  outline: none;
+  border-color: var(--cdc-green);
+  box-shadow: 0 0 0 1px var(--cdc-green);
+}
+.in:disabled,
+.sel:disabled {
+  background: var(--cdc-bg);
+  color: var(--cdc-disabled);
+}
+
+/* On/off switch (see components/AppSwitch.vue). */
+.sw {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  cursor: pointer;
+  flex: none;
+  background: var(--cdc-input-border);
+  transition: background 0.15s;
+}
+.sw[aria-checked='true'] {
+  background: var(--cdc-green);
+}
+.sw span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.sw[aria-checked='true'] span {
+  left: 25px;
+}
+.sw:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Table ---------------------------------------------------------------- */
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tbl th {
+  text-align: left;
+  font-size: 10.5px;
+  color: var(--cdc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cdc-border);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--cdc-border-soft);
+  vertical-align: middle;
+}
+
+/* ---- Avatar --------------------------------------------------------------- */
+
+.av {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--cdc-avatar-bg);
+  color: var(--cdc-green-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  flex: none;
+}
+
+/* ---- Dialog --------------------------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(20 22 24 / 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  z-index: 30;
+}
+.overlay > [role='dialog'] {
+  width: min(430px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Mobile --------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .ttl {
+    font-size: 26px;
+  }
+  .btn {
+    white-space: normal;
+    text-align: center;
+  }
+  .chip {
+    white-space: normal;
+  }
+}
+
+/* Page content area (below PageBar). */
+.cnt {
+  padding: 22px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (max-width: 760px) {
+  .cnt {
+    padding: 14px 12px 30px;
+  }
+}
+
+/* ---- More prototype layouts & controls (C01 / C02 / C03) ----------------- */
+
+.g6 {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.g2b {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (max-width: 1100px) {
+  .g6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .split,
+  .g2b {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .g6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Segmented tabs. */
+.tabs {
+  display: flex;
+  background: var(--cdc-gray-bg);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tab {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--cdc-gray);
+  cursor: pointer;
+}
+.tab.on {
+  background: #fff;
+  color: var(--cdc-green);
+}
+
+/* Small filter chips. */
+.fch {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--cdc-input-border);
+  background: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--cdc-gray);
+  cursor: pointer;
+}
+.fch.on {
+  background: var(--cdc-text);
+  border-color: var(--cdc-text);
+  color: #fff;
+}
+
+/* List rows. */
+.it {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cdc-border-soft);
+  text-decoration: none;
+  color: var(--cdc-text);
+}
+.it:last-child {
+  border-bottom: 0;
+}
+a.it:hover {
+  color: var(--cdc-text);
+}
+.feed {
+  display: flex;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--cdc-border-soft);
+}
+
+/* Selectable card-buttons (asesor picker…). */
+.pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cdc-border);
+  background: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--cdc-text);
+  cursor: pointer;
+  text-align: left;
+}
+.pick.on {
+  border-color: var(--cdc-green);
+  box-shadow: 0 0 0 2px var(--cdc-green) inset;
+}
+.pick:disabled {
+  background: var(--cdc-bg);
+  color: var(--cdc-disabled);
+  cursor: not-allowed;
+}
+
+textarea.in,
+.ta {
+  min-height: 80px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+/* Softer red outline (e.g. «Perdido» inside a table row). */
+.bs.soft-bad {
+  color: var(--cdc-bad);
+  border-color: #e8b4ac;
+}
+
+/* Bordered inline panel inside a card. */
+.panel {
+  border-top: 1px solid var(--cdc-border-soft);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* History bubbles (C02 conversation feed). */
+.ev-std {
+  background: var(--cdc-bg);
+}
+.ev-warn {
+  background: var(--cdc-warn-bg);
+}
+.ev-ok {
+  background: var(--cdc-ok-bg);
+}
+.ev-acc {
+  background: #fff;
+  border: 1px dashed var(--cdc-input-border);
+}
+
+/* Stat tile and list row of the phone prototypes (K11). */
+.st {
+  background: var(--cdc-bg);
+  border-radius: 12px;
+  padding: 12px;
+}
+.li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--cdc-border-soft);
+  text-decoration: none;
+  color: var(--cdc-text);
+  min-height: 50px;
+}
+.li:last-child {
+  border-bottom: 0;
+}
+/* Tinted KPI cards (K01): something needs attention. */
+.card.tint-bad {
+  background: #fff5f3;
+  border-color: #e8b4ac;
+}
+.card.tint-warn {
+  background: #fffbf1;
+  border-color: #ebcb8b;
+}
+
+/* Quick-action tiles and step indicator of the phone prototypes (M01 / M03). */
+.qa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 78px;
+  border-radius: 14px;
+  background: var(--cdc-info-bg);
+  color: var(--cdc-green-dark);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+}
+.qa:hover {
+  background: #d7ecd3;
+  color: var(--cdc-green-dark);
+}
+.stp {
+  display: flex;
+  gap: 4px;
+}
+.stp div {
+  flex: 1;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 6px 2px;
+  border-radius: 8px;
+  background: var(--cdc-gray-bg);
+  color: var(--cdc-gray);
+}
+.stp div.on {
+  background: var(--cdc-green);
+  color: #fff;
+}
+.stp div.done {
+  background: var(--cdc-ok-bg);
+  color: var(--cdc-ok);
+}
+.stp div.bad {
+  background: var(--cdc-bad-bg);
+  color: var(--cdc-bad);
+}
+
+/* Compact pill-shaped select used in filter rows (K06 / M06). */
+.fsel {
+  min-height: 32px;
+  border: 1.5px solid var(--cdc-input-border);
+  border-radius: var(--radius-pill);
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  background: #fff;
+  color: var(--cdc-gray);
+}
+
+/* Rendimiento: orange chip, progress track, traffic-light dots. */
+.chip.nar {
+  background: #fde9d8;
+  color: #9a4a0a;
+}
+.trk {
+  height: 8px;
+  border-radius: 999px;
+  background: #ecedea;
+  overflow: hidden;
+}
+.trk > .fl {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cdc-green);
+}
+.semd {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+
+/* A list row laid out side by side (label left, value right). */
+.it.row-it {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

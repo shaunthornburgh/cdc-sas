@@ -1,0 +1,64 @@
+/*
+ * Casa Dolce Casa design tokens (from the approved .dc.html prototypes).
+ * Light theme only: the prototypes define a single palette.
+ */
+:root {
+  /* Brand */
+  --cdc-green: #00843d;
+  --cdc-green-hover: #006b31;
+  --cdc-green-dark: #0b3d23; /* sidebar */
+  --cdc-green-side-2: #14532f; /* role card / mobile menu */
+  --cdc-green-side-hover: #1a6b3d; /* sidebar hover / active */
+  --cdc-green-lime: #8dc63f; /* logo accent */
+  --cdc-side-text: #d3e6d6;
+  --cdc-side-muted: #9fc79a;
+  --cdc-side-lema: #b9d9b5;
+
+  /* Surfaces & text */
+  --cdc-bg: #f5f6f3;
+  --cdc-card: #ffffff;
+  --cdc-text: #2b2d2f;
+  --cdc-muted: #5a5d60;
+  --cdc-disabled: #7b7e81;
+  --cdc-border: #e1e3df;
+  --cdc-border-soft: #eeefec;
+  --cdc-input-border: #bcbec0;
+
+  /* Status chips: background / text */
+  --cdc-ok-bg: #e3f2e5;
+  --cdc-ok: #1f6b35;
+  --cdc-warn-bg: #fcf0d6;
+  --cdc-warn: #7a4e00;
+  --cdc-bad-bg: #fbe4e0;
+  --cdc-bad: #a3271b;
+  --cdc-info-bg: #e6f3e4;
+  --cdc-info: #00662f;
+  --cdc-gray-bg: #ecedea;
+  --cdc-gray: #45484b;
+  --cdc-pend-bg: #efe9f7;
+  --cdc-pend: #4a2f7a;
+
+  /* Avatar */
+  --cdc-avatar-bg: #d7ecd3;
+
+  /* Type */
+  --font-body: 'Montserrat', system-ui, sans-serif;
+  --font-display: 'Bebas Neue', sans-serif;
+
+  /* Shape */
+  --radius-btn: 10px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --side-width: 256px;
+  --bottom-nav-height: 76px;
+}
+
+/* Semáforo de rendimiento (prototype K07 / M08). */
+:root {
+  --sem-verde: #1f6b35;
+  --sem-amarillo: #b7791f;
+  --sem-naranja: #e07b24;
+  --sem-rojo: #a3271b;
+}
