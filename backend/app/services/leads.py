@@ -30,12 +30,12 @@ from app.models.enums import (
     ResultadoLlamada,
     TipoEventoLead,
 )
-from app.services import fechas
+from app.services import configuracion, fechas
 from app.services.errors import ConflictError, DomainError, NotFoundError, PermissionDeniedError
 from app.services.policies import can_use_leads, is_manager
 
-# «No contesta» doesn't cost points after this many calls on this many consecutive days.
-# Gerencia will configure these (G-045); defaults from the prototype.
+# «No contesta» doesn't cost points after N calls on N consecutive days (G-045). Gerencia sets both
+# in Configuración («Leads ganados y perdidos»); these are the defaults.
 MIN_LLAMADAS_SIN_DESCUENTO = 3
 MIN_DIAS_SEGUIDOS_SIN_DESCUENTO = 3
 
@@ -240,18 +240,20 @@ def call_stats(db: Session, lead: Lead) -> CallStats:
     return CallStats(llamadas=len(times), dias_seguidos=best)
 
 
-def perdida_descuenta(motivo: MotivoPerdida, stats: CallStats) -> bool:
+def perdida_descuenta(
+    motivo: MotivoPerdida,
+    stats: CallStats,
+    llamadas: int = MIN_LLAMADAS_SIN_DESCUENTO,
+    dias: int = MIN_DIAS_SEGUIDOS_SIN_DESCUENTO,
+) -> bool:
     """G-045: «Número equivocado» never costs points.
 
-    «No contesta» doesn't either after 3 calls on 3 consecutive days.
+    «No contesta» doesn't either after `llamadas` calls on `dias` consecutive days.
     """
     if motivo == MotivoPerdida.NUMERO_EQUIVOCADO:
         return False
     if motivo == MotivoPerdida.NO_CONTESTA:
-        return not (
-            stats.llamadas >= MIN_LLAMADAS_SIN_DESCUENTO
-            and stats.dias_seguidos >= MIN_DIAS_SEGUIDOS_SIN_DESCUENTO
-        )
+        return not (stats.llamadas >= llamadas and stats.dias_seguidos >= dias)
     return True
 
 
@@ -602,7 +604,10 @@ def change_stage(
             raise DomainError("Elige el motivo por el que se perdió el lead.")
         stats = call_stats(db, lead)
         lead.motivo_perdida = motivo
-        lead.perdida_descuenta = perdida_descuenta(motivo, stats)
+        reglas = configuracion.get(db, "leads")
+        lead.perdida_descuenta = perdida_descuenta(
+            motivo, stats, reglas["llamadas_minimas"], reglas["dias_seguidos"]
+        )
         titulo = f"Lead marcado como perdido · {MOTIVO_LABELS[motivo]}"
         detalle = (
             "Descuenta en el rendimiento."

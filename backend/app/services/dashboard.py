@@ -29,13 +29,19 @@ from app.models.enums import (
 )
 from app.services import captaciones as cap_service
 from app.services import citas as cita_service
-from app.services import fechas
+from app.services import configuracion, fechas
 from app.services import pedidos as pedido_service
 from app.services import preoperacional as preop_service
 from app.services.policies import LEAD_FUNCIONES, can_capture
 
 # A lead waiting this long without an owner is flagged (the «aviso» of the prototype).
-LEAD_SIN_RESPONSABLE_ALERTA = timedelta(minutes=15)
+LEAD_SIN_RESPONSABLE_ALERTA = timedelta(minutes=15)  # default; Gerencia sets it in Configuración
+
+
+def alerta_sin_responsable(db: Session) -> timedelta:
+    return timedelta(minutes=configuracion.get(db, "automatizaciones")["lead_sin_responsable_min"])
+
+
 # A follow-up counts as «a tiempo» if marked done within this margin after its time.
 SEGUIMIENTO_TOLERANCIA = timedelta(minutes=30)
 LIST_LIMIT = 6
@@ -106,8 +112,9 @@ def leads_summary(db: Session, v: Ventana | None = None) -> dict[str, Any]:
         "abiertos": sum(n for k, n in por_etapa.items() if k not in ("ganado", "perdido")),
         "abiertos_por_negocio": por_negocio,
         "sin_responsable": _count(db, sin_resp),
+        "sin_responsable_min": int(alerta_sin_responsable(db).total_seconds() // 60),
         "sin_responsable_alerta": _count(
-            db, sin_resp.where(Lead.created_at < v.now - LEAD_SIN_RESPONSABLE_ALERTA)
+            db, sin_resp.where(Lead.created_at < v.now - alerta_sin_responsable(db))
         ),
         "nuevos_hoy": _count(db, select(Lead.id).where(Lead.created_at >= v.hoy)),
         "nuevos_semana": _count(db, select(Lead.id).where(Lead.created_at >= v.semana)),
@@ -473,7 +480,7 @@ def alertas(leads: dict, citas: dict, caps: dict, eq: dict) -> list[dict[str, An
         out.append(
             {
                 "nivel": "warn",
-                "titulo": f"{n} {quien} más de 15 min sin responsable",
+                "titulo": f"{n} {quien} más de {leads['sin_responsable_min']} min sin responsable",
                 "detalle": f"{leads['sin_responsable']} sin responsable en total",
                 "que_hacer": "Pedir a Atención y Preventa que los tome, o asignarlos.",
                 "link": "/leads",

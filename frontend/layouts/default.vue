@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const auth = useAuth()
+const marca = useMarca()
 const route = useRoute()
 
 const user = computed(() => auth.user.value)
@@ -12,6 +13,7 @@ const asesor = computed(() => !manager.value && hasCommercialActivity(user.value
 const conResultado = computed(() => !!perfilRendimiento(user.value))
 const gerencia = computed(() => user.value?.cargo === 'gerencia')
 const auxiliar = computed(() => user.value?.cargo === 'auxiliar_administrativa')
+const gps = computed(() => perfilGps(user.value))
 const home = computed(() => (manager.value ? '/coordinacion' : asesor.value ? '/asesor' : '/'))
 const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 </script>
@@ -23,8 +25,8 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <div class="brand">
         <BrandLogo :size="38" />
         <div>
-          <div class="wm">CASA DOLCE CASA</div>
-          <div class="lema">Confianza que construye hogares</div>
+          <div class="wm">{{ marca.nombre }}</div>
+          <div v-if="marca.lema" class="lema">{{ marca.lema }}</div>
         </div>
       </div>
 
@@ -40,6 +42,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <div class="sect">MI DÍA</div>
       <NuxtLink v-if="asesor" class="nav" :class="{ on: isOn('/mis-citas') }" to="/mis-citas">Mis citas</NuxtLink>
       <NuxtLink class="nav" :class="{ on: route.path === '/preoperacional' }" to="/preoperacional">Mi preoperacional</NuxtLink>
+      <NuxtLink v-if="gps && !manager" class="nav" :class="{ on: isOn('/movimientos') }" to="/movimientos">{{ gps === 'atencion' ? 'Trabajo en campo y GPS' : 'Mis alertas de GPS' }}</NuxtLink>
       <template v-if="hasLeads">
         <div class="sect">LEADS Y CITAS</div>
         <NuxtLink class="nav" :class="{ on: isOn('/leads') }" to="/leads">Atención y Preventa</NuxtLink>
@@ -50,6 +53,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: isOn('/pedidos') }" to="/pedidos">Pedidos</NuxtLink>
         <NuxtLink class="nav" :class="{ on: route.path === '/inmuebles' }" to="/inmuebles">Inmuebles</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/inmuebles/administracion') }" to="/inmuebles/administracion">Administración de inmuebles</NuxtLink>
+        <NuxtLink v-if="manager" class="nav" :class="{ on: isOn('/plataformas') }" to="/plataformas">{{ gerencia ? 'Plataformas tradicionales' : 'Actualización de plataformas' }}</NuxtLink>
       </template>
       <template v-else-if="hasInmuebles">
         <div class="sect">INMUEBLES</div>
@@ -67,6 +71,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: isOn('/usuarios') }" to="/usuarios">Usuarios</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/preoperacionales') }" to="/preoperacionales">Preoperacionales</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/novedades') }" to="/novedades">Ausencias y permisos</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: isOn('/movimientos') }" to="/movimientos">Movimientos y GPS</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/equipo') || (isOn('/resultados/') && route.path !== '/resultados') }" to="/equipo">{{ gerencia ? 'Rendimiento por empleado' : 'Mi equipo' }}</NuxtLink>
         <NuxtLink class="nav" :class="{ on: route.path === '/rendimiento' }" to="/rendimiento">{{ gerencia ? 'Indicadores, metas y pesos' : 'Rendimiento e indicadores' }}</NuxtLink>
       </template>
@@ -79,6 +84,12 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <div class="sect">PERSONAL</div>
         <NuxtLink class="nav" :class="{ on: isOn('/equipo') || isOn('/resultados/') }" to="/equipo">Rendimiento y calificaciones</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/novedades') }" to="/novedades">Ausencias y permisos</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: isOn('/plataformas') }" to="/plataformas">Actualización de plataformas</NuxtLink>
+      </template>
+
+      <template v-if="manager">
+        <div class="sect">CONTROL Y AJUSTES</div>
+        <NuxtLink class="nav" :class="{ on: isOn('/configuracion') }" to="/configuracion">Configuración</NuxtLink>
       </template>
 
       <div class="side-foot">
@@ -91,8 +102,8 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <div class="brand">
         <BrandLogo :size="36" />
         <div>
-          <div class="wm">CASA DOLCE CASA</div>
-          <div class="lema">Confianza que construye hogares</div>
+          <div class="wm">{{ marca.nombre }}</div>
+          <div v-if="marca.lema" class="lema">{{ marca.lema }}</div>
         </div>
       </div>
       <span v-if="user" class="av av-top" :title="user.full_name">{{ initials(user.full_name) }}</span>
@@ -135,6 +146,10 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <NuxtLink v-if="hasPedidos && !manager" :class="{ on: isOn('/pedidos') }" to="/pedidos">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z" /><path d="M9 11h6" /><path d="M9 15h6" /></svg>
         Pedidos
+      </NuxtLink>
+      <NuxtLink v-if="gps && !manager" :class="{ on: isOn('/movimientos') }" to="/movimientos">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+        {{ gps === 'atencion' ? 'Campo' : 'GPS' }}
       </NuxtLink>
       <NuxtLink v-if="!manager" :class="{ on: route.path === '/preoperacional' }" to="/preoperacional">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>

@@ -52,7 +52,10 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
     ├── pages/asesor.vue      # Asesor home (M01 / M02)
     ├── pages/mis-citas.vue   # Asesor's citas: accept, reject, take, close (M03)
     ├── pages/preoperacional.vue   # Mi preoperacional: realizar hoy + historial y puntaje (M07 / C08)
-    └── pages/preoperacionales.vue # Team review for Coordinación / Gerencia (K09)
+    ├── pages/preoperacionales.vue # Team review for Coordinación / Gerencia (K09)
+    ├── pages/movimientos.vue      # Movimientos y GPS: alerts, justification, field work (K05, M05, K16, C09)
+    ├── pages/plataformas.vue      # Plataformas tradicionales: updates, plans, results, history (K15)
+    └── pages/configuracion.vue    # Configuración: brand, pay dates, rates, alerts, lead rules (Z02)
 ```
 
 ## Ports
@@ -738,12 +741,223 @@ The seed (`seed_novedades`) registers K13's example rows this month. It adds one
 remunerado on the 20th–21st, so an unconfirmed period shows a discount, and one annulled by
 mistake.
 
+## Movimientos y GPS (`/movimientos`, K05)
+
+**Prototype note**: K05 «Movimientos y GPS» isn't a generic movements ledger. It's the **field / GPS
+control** of the staff: alerts when an asesor leaves the route or stays still too long, their
+justification and review, and the Coordinador's / Atención y Preventa's field work. There are no
+amounts. A movimiento links to an employee and, when it applies, an inmueble (by code, linked to the
+catalog if it exists) or a cita (apoyo en cita). Leads and captaciones are reached through the cita;
+there's no direct link. Built from K05 / K05-ger, M05 «Justificar», K16 and C09 «Trabajo en campo»,
+and decisions G-002, G-036, G-039, G-040, G-048 and G-081.
+
+Rules are in `backend/app/services/movimientos.py`.
+
+**Types** (codes `MOV-0001`…):
+- Alerts: «Salida de ruta», «Tiempo detenido» (asesores with Captación), «Salida de la zona»
+  (Coordinador). The Coordinador and Atención y Preventa also get «Tiempo detenido», but only
+  while they're in the field: their GPS is on only then.
+- Field records: «Trabajo en campo (Coordinador)» (apoyo en cita, acompañamiento en ruta, salida
+  grupal, otra) and «Atención en campo» (apoyo en cita, otra; no acompañamiento, G-040).
+
+**Statuses**: Sin justificar → Justificada · por revisar → ✓ Aprobada / ✕ Rechazada · −1 punto.
+Field records are «Registro de campo». «Vencida» isn't stored: it's an alert still unjustified
+after the deadline.
+
+**Rules**:
+- The GPS only reports during the working day (8:00 a. m.–6:00 p. m.). A late report from a phone
+  that was offline is accepted up to 24 h later.
+- Justifying (M05, only the person): a cita fuera de ruta / cita no programada / inventario needs
+  the inmueble code, client and observation. A personal reason needs the reason, plus who
+  authorized it (salidas) or optional evidence (tiempo detenido).
+- Coordinación reviews asesores and Atención y Preventa. Gerencia reviews the Coordinador (as in
+  K05-ger, Gerencia doesn't review asesores). Nobody reviews themselves. The review note is optional.
+- A rejected alert, or one left unjustified past the deadline, takes **1 point** off that month's
+  rendimiento (shown in «Descuentos» on the results page). A pending alert also shows as an aviso
+  there.
+- The deadline is **PENDIENTE DE CONFIGURACIÓN** until Coordinación or Gerencia sets it on the page.
+  Until then nothing expires. Once it passes, the alert can't be justified any more.
+- Coordinación and Gerencia set the stopped time that triggers an alert (15 / 20 / 30 / other
+  minutes, 20 by default) on the same page. Each alert keeps the threshold it was created with.
+- One open field record per person. Finishing it turns the GPS off. A record left open counts
+  until 6:00 p. m. that day.
+- Location privacy: lists never return coordinates. «Ver ubicación» calls `POST /{id}/ubicacion`,
+  which logs who looked and when in the history.
+- History: every action (registered, justified, approved, rejected, finished, location viewed) is
+  a `movimiento_eventos` row with actor, time and status before → after. Config changes and
+  downloads are logged too, without a movimiento.
+
+**Who sees what**:
+| Role | Page |
+|------|------|
+| Gerencia | «Indicadores y registro» (Desde/Hasta, last 30 days by default; empleado, acción, estado filters; 6 KPIs; «Por empleado» 5 at a time; registro with «Ver más»; CSV download) and «Configuración y mapa» |
+| Coordinación | «Hoy, configuración y mapa» (K05), plus «Indicadores y registro» and «Mi trabajo en campo» (K16) |
+| Asesor with Captación | «Mis alertas de GPS»: their alerts and the M05 form |
+| Atención y Preventa | «Trabajo en campo y GPS»: start / finish field work (C09), their alerts |
+| Auxiliar, asesores without Captación | No access (no GPS) |
+
+**Navigation**: sidebar «Movimientos y GPS» in EQUIPO for Coordinación and Gerencia (G-081 puts it
+under «Empleados»), plus a card on the Coordinación / Gerencia dashboard since their bottom nav is
+full. Asesores with Captación and Atención y Preventa get it in MI DÍA and in the bottom nav («GPS»
+/ «Campo»).
+
+**Simplifications**:
+- No real GPS tracking. `POST /movimientos/alertas` is the endpoint the phone would call; the demo
+  alerts come from the seed. Route and zone detection belong to that future integration.
+- The map is a schematic SVG like the prototype's: today's positions placed relative to each
+  other, not a real map. «Ver ubicación» opens OpenStreetMap.
+- «Descargar (Excel)» downloads a CSV that Excel opens (same as Rendimiento).
+- No notifications: M05 opens from the bell in the prototype. Here the person sees their pending
+  alerts on the page and as an aviso in «Mis resultados».
+- «Días en campo programados» (K16 / C09) isn't built: there's no agenda module yet.
+- Coordinación's page adds the registro and «Mi trabajo en campo» tabs to K05's single view, so it
+  has the history and filters too and can register its own field work.
+- Evidence for a tiempo detenido is a file count, like the other modules (no uploads yet).
+
+Endpoints (`/api/v1/movimientos`):
+- `GET /opciones` (labels, motives per type, what this person can start, asesores and citas for
+  field work, config, default range)
+- `GET ?desde=&hasta=&empleado_id=&tipo=&estado=` (list + KPIs + per person + own pending alerts;
+  everyone except Coordinación / Gerencia only gets their own)
+- `GET /export.csv` (same filters; Coordinación / Gerencia)
+- `GET /panel` (config, who has GPS, people in the field now, today's alerts, map points)
+- `PUT /config` (`{minutos_alerta?, plazo_horas?}`; `plazo_horas: null` sets it back to pending)
+- `POST /alertas` (`{tipo, ocurrido_at?, lat?, lng?, lugar?}`: the phone reports an alert)
+- `POST /campo` (`{tipo_campo, actividad_campo, cita_id?, acompanados_ids?, detalle?}`)
+- `GET /{id}` · `GET /{id}/historial`
+- `POST /{id}/justificar` · `/aprobar` · `/rechazar` (`{nota?}`) · `/finalizar` · `/ubicacion`
+
+The seed (`seed_movimientos`) loads K05-ger's example log over the last 30 days: today's alerts for
+the asesor (one to justify, one to review, one approved), Bruno's, the Coordinador's (one waiting for
+Gerencia), Atención's, and the Coordinador's / Atención's field work. «Today» rows whose time hasn't
+come yet move to yesterday.
+
+## Plataformas tradicionales (`/plataformas`, K15)
+
+**Prototype note**: K15 «Actualización de plataformas» isn't about publishing listings. It's the
+**control of the paid real-estate portals** (Ciencuadras, Espacio Urbano, Proppi…): each portal's
+plan (price, dates, quota, featured listings), the periodic «actualización» where someone checks
+the portal and records what's used, and how much each portal brings in. Built from K15 (Coordinación)
+and K15-ger (Gerencia), and decisions G-019, G-0xx (rendimiento del Coordinador) and G-079.
+
+Rules are in `backend/app/services/plataformas.py`.
+
+**Model**:
+- `plataformas`: one row per portal. Its `fuente` matches the leads' source, so results come from
+  real leads. It has a colour, an active flag and the assigned responsable.
+- `plataforma_planes`: each paid period (price, activation, expiry, total quota, featured listings,
+  alarm days). A renewal is a new row, so past costs stay right.
+- `plataforma_actualizaciones`: each update (active listings, total quota, featured used, note),
+  with who did it, who was responsable then, days since the previous one and whether it was on time.
+- `plataforma_eventos`: registro de cambios (responsable, plans, on/off, rule, downloads).
+- `plataformas_config`: the rule «se debe actualizar al menos cada N días».
+
+**Statuses**:
+- Portal: «Al día», «Atrasada» (last update more than N days ago) or «Sin actualizar».
+- Update: «A tiempo», or «Tarde (más de N días)» when it came more than N days after the previous one.
+- Plan: «Activo · vence 14 oct», «⚠ Vence en N días» (inside the alarm), «Vencido · inactivo»,
+  «Renovado · sigue desde …» (the next plan is already registered) or «Sin plan registrado».
+
+**Rules**:
+- The rule is 7 days, an example value shown as «PENDIENTE DE CONFIGURACIÓN» until Gerencia saves it.
+- Publicaciones activas can't pass the cupo total, nor destacados usados the plan's destacados.
+  The «Cupo total del plan» typed in an update also corrects the current plan.
+- Cost of a range = each plan's price spread over its days × the plan days inside the range, up to
+  today. Cost per lead / per cierre divides that.
+- Leads = leads created in the range with that `fuente`; citas = their citas in the range (not
+  cancelled); cierres = their leads «Ganado» in the range.
+- **Rendimiento**: the Coordinador's «Actualización de plataformas» area (until now «sin datos»)
+  is the share of days of the month that the portals assigned to them were «al día». With nothing
+  assigned, the area has no data and doesn't count.
+
+**Who**:
+| Role | Can |
+|------|-----|
+| Coordinación | K15: see the portals and register updates for any of them; download the history |
+| Auxiliar administrativa | Same page; registers only the portals assigned to her (she appears in K15-ger's log) |
+| Gerencia | K15-ger: «Actualizaciones» (KPIs, last update per portal, assign responsable, the rule, log with «Ver más»), «Resultados de los portales» (KPIs, per-portal table, plans, leads per month chart), «Histórico y descarga». Doesn't register updates. |
+| Everyone else | No access |
+
+The responsable can be someone from Coordinación or the Auxiliar.
+
+**Navigation**: «Actualización de plataformas» (Coordinación) / «Plataformas tradicionales»
+(Gerencia) in COMERCIAL, as in the Coordinación menu (G-0xx moved it into Comercial). The Auxiliar has
+it in PERSONAL. There's also a card on the Coordinación / Gerencia dashboard. No bottom-nav item:
+these are desk tasks and the managers' bottom nav is full.
+
+**Simplifications**:
+- Plans are registered by Gerencia on this page (tap the plan chip in «Resultados»). The prototype
+  expects them to come from «Integraciones» (G-019), which doesn't exist yet. The portals are the
+  traditional `fuente` values: Finca Raíz and Metrocuadrado exist but start inactive. A brand-new
+  portal needs a new `fuente_lead` value (migration).
+- The download is a CSV that Excel opens. There's no PDF option.
+- Atención y Preventa doesn't appear as a possible responsable (K15-ger lists them, but no Atención
+  screen links to K15, so they couldn't register).
+- Rendimiento uses the current responsable for the whole month: changing it mid-month moves the
+  whole month to the new person.
+- No automatic expiry notification: the alarm shows as the plan chip.
+
+Endpoints (`/api/v1/plataformas`):
+- `GET /opciones` (portals, responsables, who has updated, default range: last three months)
+- `GET ?desde=&hasta=&plataforma_id=&quien_id=` (portals with status, KPIs, updates in the range)
+- `GET /resultados?desde=&hasta=&plataforma_id=` · `GET /historico` (5-row preview) · `GET /historico.csv`
+- `GET /cambios` (registro de cambios) · `PUT /regla` (`{dias_regla}`, Gerencia)
+- `POST /{id}/actualizaciones` (`{cupo_usado, cupo_total, destacados_usados, destacados_total?, observacion?}`)
+- `PUT /{id}/responsable` · `POST /{id}/planes` · `PUT /{id}/activa` (Gerencia)
+
+The seed (`seed_plataformas`) creates the three K15 portals with K15's quotas and prices: the
+current quarterly plan, the previous one, and about five months of updates with K15's gaps. Proppi
+is late and about to expire. It also adds closed leads from the portals for the last four months
+(K15-ger's figures): mostly «Perdido», a few «Ganado». The «Ganado» ones show up as deals in
+Compensación, without a closing asesor or commission.
+
+## Configuración (`/configuracion`, Z02)
+
+Built from Z02 (Coordinación) and Z02-ger (Gerencia). Rules are in
+`backend/app/services/configuracion.py`.
+
+**Storage**: table `configuracion`, one row per section. It stores only the values that differ from
+the defaults; the defaults live in code (`DEFAULTS`), so nothing needs seeding and a fresh database
+shows Z02's example values. Every change goes to `configuracion_eventos` with who, when, and the
+values before and after. The page shows the last 15.
+
+**Sections** (Gerencia edits everything; Coordinación only reads the pay dates):
+| Section | What | Used by |
+|---------|------|---------|
+| Marca | Logo (PNG or SVG, < 150 KB, stored as a data URL), name, tagline, three greens | **Wired**: sidebar, mobile bar, login and `BrandLogo`. Greens become CSS variables on `<html>` during server rendering (hover and sidebar shades are derived). Traffic-light colours never change. `GET /configuracion/marca` is public so the login page can show it. |
+| Pendientes para salir a producción | 10 items. 3 resolve themselves when set where they live (GPS deadline in Movimientos, the update rule in Plataformas, retención in Tarifas); 7 Gerencia ticks as defined. «Activar uso real» only works with none left. | The flag is stored; nothing else changes with it yet |
+| Fechas de pago al personal | Salary cuts and the commission pay day | **Wired**: reads and writes Compensación's config (`dia_corte_1`, `dia_corte_2`, `dia_pago`), already used by «Salarios del mes», «Comisiones» and «Mis pagos» |
+| Tarifas de intermediación | Arriendo %, papelería, IVA, venta %, referidos %, retención (empty = pending) | Stored only: «Negocios» doesn't exist yet |
+| Automatizaciones y avisos | Minutes before a lead without responsable alerts; daily summary time; escalation | **Wired**: the minutes drive the «sin responsable» alert on the Coordinación dashboard (was hardcoded at 15). The other two are stored for the future notifications module. |
+| Idioma | Español / English / Italiano | Only Spanish can be applied; the others show «traducción pendiente» |
+| Leads ganados y perdidos | Points per lead ganado / perdido; minimum calls on consecutive days | **Wired**: rendimiento of Atención y Preventa (was `PUNTOS_LEAD_*`) and `leads.perdida_descuenta` (was 3 calls in 3 days). Values are chosen from lists, and a lost lead must cost less than a won one adds. |
+
+The cards at the bottom link to the settings that live on their own pages (users, absences,
+indicators and weights, compensation, salaries, GPS, platforms).
+
+**Simplifications**:
+- The automations status table only lists what really runs: the unattended-lead alert and the lead
+  points. The others say «Pendiente: módulo de avisos» instead of Z02's example statuses.
+- Lead points apply to the whole current month when changed. Z02 says «desde el día siguiente»,
+  which would need the rules' history per day. The call rule applies to leads marked lost from then on.
+- Cards for screens that don't exist yet are left out: Integraciones, cargos laborales, costos del
+  personal, negocios, pólizas, valor y productividad, carga de leads desde Excel and Mi perfil.
+- «Si el día cae en fin de semana o festivo, se paga el día hábil anterior» is still pending, as in
+  the prototype.
+- Z02's list of 26 pendientes (G-053) is reduced to the 10 it shows.
+
+Endpoints (`/api/v1/configuracion`):
+- `GET /marca` (public) · `GET` (the whole page; Coordinación gets only brand and pay dates)
+- `PUT /marca` · `POST /marca/restaurar` · `PUT /pagos`
+- `PUT /tarifas` · `PUT /automatizaciones` · `PUT /idioma` · `PUT /leads` (partial updates)
+- `PUT /pendientes/{clave}` (`{resuelto}`) · `POST /uso-real`
+
 ## Business rules
 
 - **Cargo** defines a person's general profile: Gerencia, Coordinación, Asesor, Auxiliar administrativa, Atención al Cliente.
 - **Commercial activities** (Captación, Ventas, Arriendos) are switched on per person and stored in `user_actividades`, which records who granted each one. Coordinación will change them through `services.users.set_actividades`.
 - **Atención al Cliente** and **Pre-ventas** are independent functions (`users.funcion`) and can't be combined with commercial activities. This is checked in the service and backed by a database trigger. The Atención al Cliente cargo always has the Atención al Cliente function (a check constraint enforces it).
-- **GPS / check-in** applies only when Captación is active (`gps_checkin_enabled` on the user).
+- **GPS / check-in** applies only when Captación is active (`gps_checkin_enabled` on the user). The Coordinador and Atención y Preventa only have GPS while in the field (see Movimientos y GPS).
 
 ## Deployment (later)
 

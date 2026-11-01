@@ -349,7 +349,7 @@ def test_coordinador_areas_without_data_dont_count(client, db, p, H, T):
     captacion(db, T, p["juan"], n=2)  # verified in 2 h → monitoreo 100 %
     r = client.get(f"{R}/mio", headers=H(p["coord"])).json()
     assert area(r, "plataformas")["cumplimiento"] is None
-    assert area(r, "plataformas")["sin_datos"].startswith("Sin datos")
+    assert area(r, "plataformas")["sin_datos"].startswith("Sin plataformas asignadas")
     assert r["peso_con_datos"] == 65  # equipo 50 + monitoreo 15
     eq = area(r, "equipo")
     assert eq["logrado_txt"].endswith("3 personas")

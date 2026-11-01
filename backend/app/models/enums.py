@@ -375,3 +375,87 @@ NOVEDADES_DESCONTABLES = frozenset({TipoNovedad.INCAPACIDAD, TipoNovedad.PERMISO
 class EstadoNovedad(StrEnum):
     REGISTRADA = "registrada"  # Gerencia was notified; counts and discounts
     ANULADA = "anulada"  # a mistake; kept for the record, doesn't count
+
+
+# ---------------------------------------------------------------- movimientos y GPS
+# Prototypes K05 / K05-ger «Movimientos y GPS», M05 «Justificar», K16 / C09 «Trabajo en campo»
+# and decisions G-002, G-036, G-039, G-081.
+
+
+class TipoMovimiento(StrEnum):
+    # Alerts: the person justifies them and someone reviews them.
+    SALIDA_RUTA = "salida_ruta"  # asesor with Captación left the assigned route
+    TIEMPO_DETENIDO = "tiempo_detenido"  # more than N minutes in the same position
+    SALIDA_ZONA = "salida_zona"  # Coordinador left the zone of their field activity
+    # Field records: no justification; they show who was in the field and for how long.
+    TRABAJO_CAMPO = "trabajo_campo"  # Coordinador
+    ATENCION_CAMPO = "atencion_campo"  # Atención y Preventa
+
+
+ALERTAS_GPS = frozenset(
+    {TipoMovimiento.SALIDA_RUTA, TipoMovimiento.TIEMPO_DETENIDO, TipoMovimiento.SALIDA_ZONA}
+)
+
+
+class EstadoMovimiento(StrEnum):
+    SIN_JUSTIFICAR = "sin_justificar"  # alert waiting for the person («vencida» is derived)
+    POR_REVISAR = "por_revisar"  # justified, waiting for Coordinación / Gerencia
+    APROBADA = "aprobada"
+    RECHAZADA = "rechazada"  # −1 point in rendimiento
+    REGISTRO = "registro"  # a field record (trabajo / atención en campo), not an alert
+
+
+class MotivoMovimiento(StrEnum):
+    CITA_FUERA_RUTA = "cita_fuera_ruta"  # salida de ruta / de la zona
+    PERMISO_PERSONAL = "permiso_personal"  # salida de ruta / de la zona
+    CITA_NO_PROGRAMADA = "cita_no_programada"  # tiempo detenido
+    INVENTARIO = "inventario"  # tiempo detenido
+    IMPREVISTO_PERSONAL = "imprevisto_personal"  # tiempo detenido
+
+
+class TipoCampo(StrEnum):
+    APOYO_CITA = "apoyo_cita"
+    ACOMPANAMIENTO_RUTA = "acompanamiento_ruta"  # Coordinador only
+    SALIDA_GRUPAL = "salida_grupal"  # Coordinador only
+    OTRA = "otra"
+
+
+class ActividadCampo(StrEnum):
+    CAPTACION = "captacion"
+    VISITA_PROPIETARIO = "visita_propietario"
+    CITA_VENTA = "cita_venta"
+    CITA_ARRIENDO = "cita_arriendo"
+    INVENTARIO = "inventario"
+    OTRA = "otra"
+
+
+class TipoEventoMovimiento(StrEnum):
+    CREADO = "creado"  # alert reported by the GPS, or field work started
+    JUSTIFICADO = "justificado"
+    APROBADO = "aprobado"
+    RECHAZADO = "rechazado"
+    FINALIZADO = "finalizado"  # field work ended
+    UBICACION = "ubicacion"  # someone opened the location (privacy log)
+    CONFIG = "config"  # alert time / deadline changed (movimiento_id is NULL)
+    DESCARGA = "descarga"  # export downloaded (movimiento_id is NULL)
+
+
+# ---------------------------------------------------------------- plataformas tradicionales
+# Prototypes K15 / K15-ger «Actualización de plataformas» and decisions G-0xx (rendimiento del
+# Coordinador), G-079 (herramienta de Gerencia).
+
+PLATAFORMAS_TRADICIONALES = (
+    FuenteLead.CIENCUADRAS,
+    FuenteLead.ESPACIO_URBANO,
+    FuenteLead.PROPPI,
+    FuenteLead.FINCA_RAIZ,
+    FuenteLead.METROCUADRADO,
+)
+
+
+class TipoEventoPlataforma(StrEnum):
+    RESPONSABLE = "responsable"  # Gerencia assigned who keeps it updated
+    PLAN = "plan"  # a plan was registered or corrected
+    ACTIVA = "activa"  # the platform was switched on / off
+    REGLA = "regla"  # «se debe actualizar cada N días» changed (plataforma_id is NULL)
+    DESCARGA = "descarga"  # history downloaded (plataforma_id is NULL)

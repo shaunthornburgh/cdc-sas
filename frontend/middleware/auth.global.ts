@@ -25,7 +25,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     (to.meta.module === 'asesor' && !(hasCommercialActivity(user) || isManager(user))) ||
     (to.meta.module === 'pedidos' && !canUsePedidos(user)) ||
     (to.meta.module === 'resultados' && !perfilRendimiento(user)) ||
-    (to.meta.module === 'inmuebles' && !canUseInmuebles(user))
+    (to.meta.module === 'inmuebles' && !canUseInmuebles(user)) ||
+    (to.meta.module === 'movimientos' && !canUseMovimientos(user))
   if (moduleDenied || (to.meta.cargos && !to.meta.cargos.includes(user.cargo))) {
     return abortNavigation(
       createError({ statusCode: 403, message: 'No tienes acceso a esta página.' }),

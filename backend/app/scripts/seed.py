@@ -17,8 +17,10 @@ from app.scripts.seed_captaciones import seed_captaciones
 from app.scripts.seed_compensacion import seed_compensacion
 from app.scripts.seed_inmuebles import seed_inmuebles
 from app.scripts.seed_leads import seed_leads
+from app.scripts.seed_movimientos import seed_movimientos
 from app.scripts.seed_novedades import seed_novedades
 from app.scripts.seed_pedidos import seed_pedidos
+from app.scripts.seed_plataformas import seed_plataformas
 from app.scripts.seed_preoperacional import seed_preoperacional
 from app.scripts.seed_rendimiento import seed_rendimiento
 from app.services.users import create_user, get_user_by_email
@@ -98,6 +100,14 @@ def main() -> None:
         print(f"  inmueb.  {n} in the catalog" if n else "  inmueb.  already present, skipped")
         n = seed_administracion(db)
         print(f"  admin.   {n} records" if n else "  admin.   already present, skipped")
+        n = seed_plataformas(db)
+        print(f"  plataf.  {n} platform updates" if n else "  plataf.  already present, skipped")
+        n = seed_movimientos(db)
+        print(
+            f"  movim.   {n} GPS alerts and field records"
+            if n
+            else "  movim.   already present, skipped"
+        )
         db.commit()
 
 

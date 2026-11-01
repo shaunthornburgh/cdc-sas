@@ -3,6 +3,7 @@ definePageMeta({ layout: 'auth', public: true })
 useHead({ title: 'Iniciar sesión · Casa Dolce Casa' })
 
 const auth = useAuth()
+const marca = useMarca()
 const route = useRoute()
 
 const email = ref('')
@@ -28,8 +29,8 @@ async function onSubmit() {
 <template>
   <div class="hero">
     <BrandLogo :size="92" />
-    <div class="hero-wm">CASA DOLCE CASA</div>
-    <div class="hero-lema">Confianza que construye hogares</div>
+    <div class="hero-wm">{{ marca.nombre }}</div>
+    <div v-if="marca.lema" class="hero-lema">{{ marca.lema }}</div>
   </div>
 
   <form class="card login" novalidate @submit.prevent="onSubmit">

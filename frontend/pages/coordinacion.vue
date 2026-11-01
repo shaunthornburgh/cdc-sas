@@ -310,6 +310,8 @@ const equipoCel = computed(() => [
           <NuxtLink class="card link-card" to="/usuarios"><b>Activar o quitar actividades</b><div class="mut small">Captación, Ventas y Arriendos por persona. El GPS sigue a Captación.</div></NuxtLink>
           <NuxtLink class="card link-card" to="/citas"><b>Control de citas</b><div class="mut small">Reasignar, reprogramar o cancelar las que requieren acción.</div></NuxtLink>
           <NuxtLink class="card link-card" to="/preoperacionales"><b>Preoperacionales</b><div class="mut small">Quién lo hizo hoy, novedades por revisar y el puntaje automático del mes.</div></NuxtLink>
+          <NuxtLink class="card link-card" to="/plataformas"><b>{{ me.cargo === 'gerencia' ? 'Plataformas tradicionales' : 'Actualización de plataformas' }}</b><div class="mut small">Cupo, destacados y quién actualizó cada portal; cuenta en el rendimiento del Coordinador.</div></NuxtLink>
+          <NuxtLink class="card link-card" to="/movimientos"><b>Movimientos y GPS</b><div class="mut small">Salidas de ruta y tiempos detenidos de hoy, justificaciones por revisar y el trabajo en campo.</div></NuxtLink>
           <NuxtLink class="card link-card" to="/novedades"><b>Ausencias y permisos</b><div class="mut small">Incapacidades y permisos del personal, y las novedades del preoperacional.</div></NuxtLink>
           <NuxtLink class="card link-card" to="/captaciones"><b>Verificar captaciones</b><div class="mut small">Solo las aprobadas suman en la captación del asesor.</div></NuxtLink>
         </div>

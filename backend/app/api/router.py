@@ -7,12 +7,15 @@ from app.api.routes import (
     captaciones,
     citas,
     compensacion,
+    configuracion,
     dashboard,
     health,
     inmuebles,
     leads,
+    movimientos,
     novedades,
     pedidos,
+    plataformas,
     preoperacional,
     rendimiento,
     users,
@@ -34,3 +37,6 @@ api_router.include_router(compensacion.router)
 api_router.include_router(inmuebles.router)
 api_router.include_router(administracion.router)
 api_router.include_router(novedades.router)
+api_router.include_router(movimientos.router)
+api_router.include_router(plataformas.router)
+api_router.include_router(configuracion.router)

@@ -12,7 +12,7 @@ How the result is calculated (prototype v143 · DECISIONS G-0xx):
   a rating calculated by the system (preoperacional.puntaje). Puntualidad needs «Marcar entrada»,
   which doesn't exist yet, so it is shown without data.
 * **Atención y Preventa**: each lead ganado adds 1 point; each lead perdido that «descuenta»
-  (leads.perdida_descuenta) takes off 0.5.
+  (leads.perdida_descuenta) takes off 0.5. Gerencia changes both in Configuración.
 * **Semáforo**: verde 80–100 · amarillo 70–79 · naranja 60–69 · rojo < 60.
 * Nobody adds or removes points by hand: numbers come from what each person registers.
 
@@ -53,7 +53,7 @@ from app.models.enums import (
     TipoEventoLead,
     TipoNegocio,
 )
-from app.services import fechas
+from app.services import configuracion, fechas, movimientos, plataformas
 from app.services import preoperacional as preop
 from app.services.errors import DomainError, NotFoundError, PermissionDeniedError
 from app.services.leads import ETAPA_LABELS, MOTIVO_LABELS
@@ -61,8 +61,6 @@ from app.services.pedidos import MOTIVO_LABELS as MOTIVO_PEDIDO_LABELS
 from app.services.policies import LEAD_FUNCIONES, has_commercial_activity
 
 DESCUENTO_CALIFICACION = 5  # points off for each rating of 2 or 1
-PUNTOS_LEAD_GANADO = 1.0
-PUNTOS_LEAD_PERDIDO = 0.5  # PENDIENTE DE CONFIGURACIÓN by Gerencia (example value)
 SEGUIMIENTO_MARGEN = timedelta(minutes=30)  # «a tiempo»: done up to 30 min after its time
 VERIFICACION_PLAZO = timedelta(hours=24)  # Coordinación verifies a captación within 24 h
 CITAS_DE_CLIENTE = (TipoCita.VISITA_ARRIENDO, TipoCita.VISITA_VENTA, TipoCita.REUNION_ASESORIA)
@@ -207,8 +205,10 @@ AREAS: dict[str, AreaDef] = {
         AreaDef(
             "plataformas",
             "Actualización de plataformas",
-            "Plataformas al día: cupo disponible y destacados.",
+            "Días del mes en que las plataformas que tiene asignadas estuvieron al día "
+            "(actualizadas dentro de la regla de días que define Gerencia).",
             None,
+            link="/plataformas",
         ),
         AreaDef(
             "rutas",
@@ -219,7 +219,6 @@ AREAS: dict[str, AreaDef] = {
     )
 }
 SIN_MODULO = {
-    "plataformas": "Sin datos: se calcula cuando exista «Actualización de plataformas».",
     "rutas": "Sin datos: se califica cuando existan las rutas del equipo.",
 }
 AREAS_ASESOR = (
@@ -906,13 +905,14 @@ class Calculo:
             self._cumplir(a, d)
 
         ajustes: list[dict[str, Any]] = []
+        puntos = configuracion.get(self.db, "leads")  # Gerencia sets them in Configuración
         if ganados:
             ajustes.append(
                 {
                     "tipo": "ganados",
                     "titulo": f"Ganados: {len(ganados)}",
                     "detalle": "Negocios cerrados, confirmados por Coordinación o Gerencia.",
-                    "puntos": PUNTOS_LEAD_GANADO * len(ganados),
+                    "puntos": puntos["puntos_ganado"] * len(ganados),
                 }
             )
         con = [lead for lead in perdidos if lead.perdida_descuenta]
@@ -940,7 +940,7 @@ class Calculo:
                         for lead in con
                         if lead.motivo_perdida
                     ),
-                    "puntos": -PUNTOS_LEAD_PERDIDO * len(con),
+                    "puntos": -puntos["puntos_perdido"] * len(con),
                 }
             )
         return ajustes
@@ -963,6 +963,18 @@ class Calculo:
                 a.logrado, a.cumplimiento = round(prom, 1), round(prom)
                 a.meta_txt = "Promedio del equipo"
                 a.logrado_txt = f"{_n(prom)} % · {len(totals)} personas"
+            elif a.key == "plataformas":
+                c = plataformas.cumplimiento(self.db, user, self.p.first, self.p.last)
+                if c is None:
+                    a.sin_datos = "Sin plataformas asignadas: Gerencia asigna el responsable."
+                    continue
+                ok, total, n = c
+                a.meta, a.meta_txt = total, f"{n} plataforma{'s' if n != 1 else ''} al día"
+                a.logrado = ok
+                a.cumplimiento = _pct(ok, total)
+                a.logrado_txt = f"Al día el {a.cumplimiento} % de los días"
+                if ok < total:
+                    a.falta = f"Atrasadas {total - ok} de {total} días (sumando tus plataformas)"
             elif a.key == "monitoreo":
                 limite = fechas.now() - VERIFICACION_PLAZO
                 caps = [
@@ -1074,6 +1086,8 @@ class Calculo:
             for c in cal
             if c["valor"] is not None and c["valor"] <= 2
         ]
+        # G-036: 1 point per GPS alert rejected or left unjustified past the deadline.
+        desc += movimientos.descuentos(self.db, user, p.start, p.end)
         avisos = []
         hoy = preop.hoy()
         if (
@@ -1088,6 +1102,15 @@ class Calculo:
                     "titulo": "Preoperacional de hoy pendiente",
                     "detalle": "Si no lo haces, baja tu nota del preoperacional del mes.",
                     "link": "/preoperacional",
+                }
+            )
+        pend = len(movimientos.pendientes_de(self.db, user)) if p.en_curso else 0
+        if pend and movimientos.perfil(user):
+            avisos.append(
+                {
+                    "titulo": f"{pend} alerta{'s' if pend != 1 else ''} de GPS sin justificar",
+                    "detalle": "Si no la justificas a tiempo o la rechazan, se descuenta 1 punto.",
+                    "link": "/movimientos",
                 }
             )
         return cal, desc, avisos
