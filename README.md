@@ -59,7 +59,8 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
     ├── pages/avisos.vue           # Avisos y agenda / Notificaciones: bell, resumen, agenda, comunicados (G09, M10, C05)
     ├── pages/agenda.vue           # Agenda / Mi agenda: one view per person, assign, answer (G09, K19, M17, C07, X06)
     ├── pages/perfil.vue           # Mi perfil: photo, data, password (Z01, M11)
-    └── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
+    ├── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
+    └── pages/integraciones.vue    # Integraciones: results per platform and connection data (G07)
 ```
 
 ## Ports
@@ -1161,13 +1162,14 @@ already say who did something and when, and shows them as one list, newest first
 | Agenda | `agenda_items` (added / assigned, answered, deleted) |
 | Avisos | `comunicados` sent |
 | Comisiones · Bonos · Pagos · Salarios · Negocios | `compensacion_eventos` (by entity) |
+| Integraciones | `integracion_eventos` (data saved, tests, disconnections, settings) |
 | Configuración | `configuracion_eventos` (and this page's downloads) |
 
 Each row has Fecha, Hora, Usuario («Sistema» when nobody did it), Módulo, Acción, Registro (code or
 person, linked to its page) and Antes / Después (where the history keeps them; otherwise the detail).
 
 **Who**: Gerencia sees everything. Coordinación sees the operation of its team: it doesn't see
-Comisiones, Bonos, Pagos, Salarios, Negocios or Configuración (G06-coord; asking for them returns
+Comisiones, Bonos, Pagos, Salarios, Negocios, Integraciones or Configuración (G06-coord; asking for them returns
 403). The Auxiliar and everyone else have no access (no prototype gives it to them).
 
 **Filters** (as G06): module chips, user, Desde / Hasta (last 7 days by default, at most a year),
@@ -1192,6 +1194,54 @@ Endpoints (`/api/v1/registro-cambios`):
 - `GET /opciones` (modules this person can see, users, default range, scope note)
 - `GET ?desde=&hasta=&modulo=&usuario_id=&q=&offset=&limit=` (`items`, `total`)
 - `GET /export.csv` (same filters)
+
+## Integraciones (`/integraciones`, G07)
+
+G07 «Integraciones» (decision G-019): what each platform produces (leads, costs, cost per lead,
+closed deals) and the data to connect it. **Only Gerencia** sees and manages it (403 for everyone
+else); it's in CONTROL Y AJUSTES and has a card in Configuración. Rules are in
+`backend/app/services/integraciones.py`.
+
+**Catalog** (as G07, created automatically on first use): Plataformas tradicionales (Ciencuadras,
+Espacio Urbano, Proppi, Finca Raíz, Metrocuadrado), Redes sociales (Facebook, Instagram, TikTok),
+Canales y servicios (Correo de avisos de portales, WhatsApp Business, Google Maps, Google Calendar /
+Outlook, Firma electrónica). Each one stores its state, how its data arrives, a monthly cost, the
+connection data and «Avisar a Gerencia si la conexión falla» (`integraciones`); every action is an
+`integracion_eventos` row, shown in its history and in «Registro de cambios».
+
+**Resultados (real data)**: for lead sources, leads, costos, costo por lead, cerrados (arriendos ·
+ventas), conversión, costo por negocio cerrado, en proceso and último lead come from the leads whose
+`fuente` is that platform, in the Desde / Hasta range (last 90 days by default). Cost: portals use
+their plans in «Plataformas tradicionales» (one source of truth); social networks and services use
+the monthly cost registered here, spread over the days of the range up to today. The 4 KPIs add up
+all platforms. Services show their cost and a usage figure: WhatsApp counts the messages sent by
+WhatsApp recorded in the leads; the others show «—» until they exist.
+
+**Conexión (no real connectors)**: the app can't talk to any external platform yet, so:
+- «Guardar y conectar» saves the data and leaves the integration **«Por confirmar conexión»**,
+  never «Conectado» (no integration can reach that state today).
+- «Probar conexión» answers honestly «Todavía no hay conector para X» and logs the test.
+- **Secrets are not stored.** Fields marked as keys keep only a hint («••••1234») to show they were
+  typed; the value itself is discarded and never returned. Leaving a key empty keeps the hint.
+  When connectors exist, the keys will need encrypted storage and re-entry.
+- «Desconectar» (with confirmation) clears the connection data; results already received stay.
+- Google Calendar / Outlook asks for nothing here: each person would authorize it from Mi agenda.
+
+**+ Agregar integración**: name, group, how the data arrives, user/code and monthly cost; it starts
+«Por confirmar conexión».
+
+**Simplifications**:
+- A new platform added here has no leads: lead sources are the `fuente_lead` enum, so a new source
+  needs a code change. It also doesn't appear in «Actualización de plataformas» (same reason).
+- «Avisar a Gerencia si la conexión falla» is saved but never fires: without connectors, nothing fails.
+- «Último dato» is the last lead from that source, not the last sync.
+- Costs of Facebook, Instagram, TikTok and Maps in the seed are G07's example quarter figures ÷ 3.
+  The real cost origin is PENDIENTE DE CONFIGURACIÓN, as in G07.
+
+Endpoints (`/api/v1/integraciones`):
+- `GET ?desde=&hasta=` (KPIs, groups with each item's summary and state)
+- `POST` (add) · `GET /{id}` (results, connection, history) · `PATCH /{id}` (cost, how, alert)
+- `PUT /{id}/datos` (save connection data) · `POST /{id}/probar` · `POST /{id}/desconectar`
 
 ## Business rules
 

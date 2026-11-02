@@ -18,6 +18,7 @@ from app.scripts.seed_avisos import seed_avisos
 from app.scripts.seed_captaciones import seed_captaciones
 from app.scripts.seed_compensacion import seed_compensacion
 from app.scripts.seed_inmuebles import seed_inmuebles
+from app.scripts.seed_integraciones import seed_integraciones
 from app.scripts.seed_leads import seed_leads
 from app.scripts.seed_movimientos import seed_movimientos
 from app.scripts.seed_novedades import seed_novedades
@@ -111,6 +112,8 @@ def main() -> None:
         print(f"  admin.   {n} records" if n else "  admin.   already present, skipped")
         n = seed_plataformas(db)
         print(f"  plataf.  {n} platform updates" if n else "  plataf.  already present, skipped")
+        n = seed_integraciones(db)
+        print(f"  integr.  {n} integrations" if n else "  integr.  already present, skipped")
         n = seed_movimientos(db)
         print(
             f"  movim.   {n} GPS alerts and field records"

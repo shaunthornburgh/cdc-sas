@@ -119,6 +119,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <template v-if="manager">
         <div class="sect">CONTROL Y AJUSTES</div>
         <NuxtLink class="nav" :class="{ on: isOn('/trazabilidad') }" to="/trazabilidad">Registro de cambios</NuxtLink>
+        <NuxtLink v-if="gerencia" class="nav" :class="{ on: isOn('/integraciones') }" to="/integraciones">Integraciones</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/configuracion') }" to="/configuracion">Configuración</NuxtLink>
       </template>
 

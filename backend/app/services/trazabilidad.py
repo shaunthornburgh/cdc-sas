@@ -84,9 +84,12 @@ MODULOS = [
     "Pagos",
     "Salarios",
     "Negocios",
+    "Integraciones",
     "Configuración",
 ]
-SOLO_GERENCIA = frozenset({"Comisiones", "Bonos", "Pagos", "Salarios", "Negocios", "Configuración"})
+SOLO_GERENCIA = frozenset(
+    {"Comisiones", "Bonos", "Pagos", "Salarios", "Negocios", "Integraciones", "Configuración"}
+)
 MAX_POR_FUENTE = 3000
 MAX_DIAS = 366
 MAX_DESCARGA = 10_000
@@ -716,6 +719,30 @@ def _compensacion(db: Session, r: Rango) -> list[Fila]:
             )
         )
     return out
+
+
+@fuente("Integraciones")
+def _integraciones(db: Session, r: Rango) -> list[Fila]:
+    from app.models import IntegracionEvento
+
+    q = select(IntegracionEvento)
+    return [
+        Fila(
+            id=f"int:{e.id}",
+            at=e.created_at,
+            actor_id=e.actor_id,
+            actor=_name(e.actor),
+            modulo="Integraciones",
+            accion=e.accion,
+            registro=e.integracion.nombre,
+            antes=e.antes,
+            despues=e.despues,
+            link="/integraciones",
+        )
+        for e in db.scalars(
+            _rango(q, IntegracionEvento.created_at, r, IntegracionEvento.actor_id)
+        ).unique()
+    ]
 
 
 @fuente("Configuración")

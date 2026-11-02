@@ -22,6 +22,7 @@ from app.models.compensacion import (
 )
 from app.models.configuracion import ConfigEvento, ConfigSeccion
 from app.models.inmuebles import Inmueble, InmuebleEvento
+from app.models.integraciones import Integracion, IntegracionEvento
 from app.models.leads import Cita, Lead, LeadEvento, Seguimiento
 from app.models.movimientos import Movimiento, MovimientoEvento, MovimientosConfig
 from app.models.novedades import Novedad
@@ -58,6 +59,8 @@ __all__ = [
     "Cita",
     "Inmueble",
     "InmuebleEvento",
+    "Integracion",
+    "IntegracionEvento",
     "Inventario",
     "InventarioAmbiente",
     "Lead",

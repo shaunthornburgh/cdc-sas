@@ -13,6 +13,7 @@ from app.api.routes import (
     dashboard,
     health,
     inmuebles,
+    integraciones,
     leads,
     movimientos,
     novedades,
@@ -48,3 +49,4 @@ api_router.include_router(avisos.router)
 api_router.include_router(agenda.router)
 api_router.include_router(perfil.router)
 api_router.include_router(trazabilidad.router)
+api_router.include_router(integraciones.router)
