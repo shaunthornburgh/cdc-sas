@@ -3,6 +3,7 @@ import type {
   ActividadEvento,
   FuncionIndependiente,
   User,
+  UserCambio,
   UserCreate,
   UserUpdate,
 } from '~/types/auth'
@@ -20,5 +21,6 @@ export function useUsers() {
     setFuncion: (id: string, funcion: FuncionIndependiente | null) =>
       api<User>(`/users/${id}/funcion`, { method: 'POST', body: { funcion } }),
     history: (id: string) => api<ActividadEvento[]>(`/users/${id}/activities/history`),
+    cambios: (id: string) => api<UserCambio[]>(`/users/${id}/cambios`),
   }
 }

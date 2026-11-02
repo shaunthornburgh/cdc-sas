@@ -155,6 +155,7 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
           items: [
             { t: 'Rutas, GPS y tiempo detenido', d: 'Tiempo detenido (15, 20, 30 minutos u otro) y plazo para justificar.', to: '/movimientos', pend: 'Validación legal del GPS: pendiente' },
             { t: 'Plataformas tradicionales', d: 'Responsable, planes y cada cuántos días se actualizan.', to: '/plataformas' },
+            { t: 'Registro de cambios', d: 'Quién hizo qué, cuándo, y cómo estaba antes y después, en todos los módulos.', to: '/trazabilidad' },
           ],
         },
       ]
@@ -172,6 +173,7 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
             { t: 'Pesos y calificaciones', d: 'Peso de cada área de los asesores (suma 100 %), calificaciones de 1 a 5.', to: '/rendimiento', pend: 'Metas reales: pendiente' },
             { t: 'Rutas, GPS y tiempo detenido', d: 'Tiempo detenido (15, 20, 30 minutos u otro).', to: '/movimientos', pend: 'Retención de la ubicación: pendiente' },
             { t: 'Actualización de plataformas', d: 'Cupo, destacados y actualizaciones de cada portal.', to: '/plataformas' },
+            { t: 'Registro de cambios', d: 'Los cambios de la operación de tu equipo, con antes y después.', to: '/trazabilidad' },
           ],
         },
       ],
@@ -263,7 +265,7 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
           <span class="mut tiny">{{ p.detalle }}</span>
           <NuxtLink v-if="p.link && !p.resuelto" :to="p.link" class="tiny"> · Ir al ajuste ›</NuxtLink>
         </span>
-        <label v-if="p.manual" class="row g6 tiny chk">
+        <label v-if="p.manual" class="row gp6 tiny chk">
           <input type="checkbox" :checked="p.resuelto" @change="marcar(p.clave, ($event.target as HTMLInputElement).checked)">
           Definido
         </label>
@@ -455,7 +457,7 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
 .fw {
   flex-wrap: wrap;
 }
-.g6 {
+.gp6 {
   gap: 6px;
 }
 .g8 {

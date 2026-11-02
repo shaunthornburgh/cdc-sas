@@ -13,6 +13,8 @@ from app.db.session import SessionLocal
 from app.models.enums import ActividadComercial as A
 from app.models.enums import Cargo, FuncionIndependiente
 from app.scripts.seed_administracion import seed_administracion
+from app.scripts.seed_agenda import seed_agenda
+from app.scripts.seed_avisos import seed_avisos
 from app.scripts.seed_captaciones import seed_captaciones
 from app.scripts.seed_compensacion import seed_compensacion
 from app.scripts.seed_inmuebles import seed_inmuebles
@@ -20,6 +22,7 @@ from app.scripts.seed_leads import seed_leads
 from app.scripts.seed_movimientos import seed_movimientos
 from app.scripts.seed_novedades import seed_novedades
 from app.scripts.seed_pedidos import seed_pedidos
+from app.scripts.seed_perfil import seed_perfil
 from app.scripts.seed_plataformas import seed_plataformas
 from app.scripts.seed_preoperacional import seed_preoperacional
 from app.scripts.seed_rendimiento import seed_rendimiento
@@ -82,6 +85,12 @@ def main() -> None:
             create_user(db, password=password, **spec)
             print(f"  created  {spec['email']}")
         db.flush()
+        n = seed_perfil(db)
+        print(
+            f"  perfil   {n} users with personal data"
+            if n
+            else "  perfil   already present, skipped"
+        )
         n = seed_leads(db)
         print(f"  leads    {n} created" if n else "  leads    already present, skipped")
         n = seed_captaciones(db)
@@ -107,6 +116,18 @@ def main() -> None:
             f"  movim.   {n} GPS alerts and field records"
             if n
             else "  movim.   already present, skipped"
+        )
+        n = seed_avisos(db)
+        print(
+            f"  avisos   2 comunicados, {n} agenda items"
+            if n
+            else "  avisos   already present, skipped"
+        )
+        n = seed_agenda(db)
+        print(
+            f"  agenda   {n} activities assigned by someone else"
+            if n
+            else "  agenda   already present, skipped"
         )
         db.commit()
 

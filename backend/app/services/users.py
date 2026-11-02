@@ -4,14 +4,16 @@ Every function takes an optional `actor` (the logged-in user making the change).
 Scripts such as the seed pass no actor and skip the actor checks.
 """
 
+import re
 from collections.abc import Iterable, Mapping
+from datetime import date
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.models import ActividadEvento, User, UserActividad
+from app.models import ActividadEvento, User, UserActividad, UserCambio
 from app.models.enums import ActividadComercial, Cargo, FuncionIndependiente
 from app.services.errors import ConflictError, DomainError, PermissionDeniedError
 
@@ -114,8 +116,93 @@ def create_user(
     return user
 
 
+CAMPO_LABELS = {
+    "full_name": "Nombre",
+    "cargo": "Cargo",
+    "is_active": "Estado",
+    "telefono": "Teléfono",
+    "documento": "Cédula",
+    "fecha_ingreso": "Fecha de ingreso",
+    "foto": "Foto",
+    "password": "Contraseña",
+}
+_TELEFONO = re.compile(r"^[0-9+()\- ]{7,40}$")
+_DOCUMENTO = re.compile(r"^[0-9A-Za-z.\-]{5,30}$")
+
+
+def _txt(v: Any) -> str | None:
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return "Activo" if v else "Inactivo"
+    if isinstance(v, date):
+        return v.isoformat()
+    if hasattr(v, "value"):
+        return str(v.value)
+    return str(v)[:300]
+
+
+def log_cambio(db: Session, user: User, campo: str, antes: Any, despues: Any, actor: User | None):
+    """Personal data changes keep the value before and after (documents are stored masked)."""
+    if campo == "documento":
+        antes, despues = mask(antes), mask(despues)
+    if campo == "foto":
+        antes = "con foto" if antes else "sin foto"
+        despues = "con foto" if despues else "sin foto"
+    db.add(
+        UserCambio(
+            user_id=user.id,
+            campo=campo,
+            antes=_txt(antes),
+            despues=_txt(despues),
+            actor_id=actor.id if actor else None,
+        )
+    )
+
+
+def mask(documento: str | None) -> str | None:
+    """«••••••2210»: only the last 4 characters (Z01)."""
+    if not documento:
+        return None
+    limpio = re.sub(r"[^0-9A-Za-z]", "", documento)  # «1.020.454.521» → last 4 = 4521
+    return "••••••" + limpio[-4:]
+
+
+def cambios(db: Session, user: User, limit: int = 30) -> list[UserCambio]:
+    return list(
+        db.scalars(
+            select(UserCambio)
+            .where(UserCambio.user_id == user.id)
+            .order_by(UserCambio.created_at.desc())
+            .limit(limit)
+        ).unique()
+    )
+
+
+def _datos(changes: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate telefono, documento and fecha_ingreso (empty = clear)."""
+    out: dict[str, Any] = {}
+    if "telefono" in changes:
+        t = (changes["telefono"] or "").strip() or None
+        if t and not _TELEFONO.match(t):
+            raise DomainError("Revisa el teléfono: solo números, espacios, + y guiones.")
+        out["telefono"] = t
+    if "documento" in changes:
+        d = (changes["documento"] or "").replace(" ", "") or None
+        if d and not _DOCUMENTO.match(d):
+            raise DomainError("Revisa la cédula: entre 5 y 30 números o letras.")
+        out["documento"] = d
+    if "fecha_ingreso" in changes:
+        f = changes["fecha_ingreso"]
+        if f is not None and f > date.today():
+            raise DomainError("La fecha de ingreso no puede ser futura.")
+        out["fecha_ingreso"] = f
+    return out
+
+
 def update_user(db: Session, user: User, changes: Mapping[str, Any], *, actor: User | None) -> User:
-    """Apply a partial update. Allowed keys: full_name, cargo, is_active, funcion."""
+    """Apply a partial update. Allowed keys: full_name, cargo, is_active, funcion, telefono,
+    documento, fecha_ingreso. Personal data changes are logged in `user_cambios`."""
     new_cargo: Cargo = changes.get("cargo", user.cargo)
     ensure_can_manage(actor, user, new_cargo)
 
@@ -133,11 +220,16 @@ def update_user(db: Session, user: User, changes: Mapping[str, Any], *, actor: U
         new_funcion = user.funcion
     validate_profile(new_cargo, new_funcion, user.actividades)
 
+    nuevos = _datos(changes)
     if "full_name" in changes:
-        user.full_name = changes["full_name"]
+        nuevos["full_name"] = changes["full_name"]
     if "is_active" in changes:
-        user.is_active = changes["is_active"]
-    user.cargo = new_cargo
+        nuevos["is_active"] = changes["is_active"]
+    nuevos["cargo"] = new_cargo
+    for campo, valor in nuevos.items():
+        if getattr(user, campo) != valor:
+            log_cambio(db, user, campo, getattr(user, campo), valor, actor)
+            setattr(user, campo, valor)
     user.funcion = new_funcion
     db.flush()
     return user

@@ -8,6 +8,7 @@ from app.models.administracion import (
     Reparacion,
     Solicitud,
 )
+from app.models.avisos import AgendaItem, Aviso, AvisoNota, Comunicado
 from app.models.captaciones import Captacion, CaptacionEvento
 from app.models.compensacion import (
     Bono,
@@ -34,11 +35,14 @@ from app.models.plataformas import (
 )
 from app.models.preoperacional import Preoperacional, PreoperacionalConfig
 from app.models.rendimiento import Calificacion, RendimientoCambio, RendimientoConfig
-from app.models.user import ActividadEvento, User, UserActividad
+from app.models.user import ActividadEvento, User, UserActividad, UserCambio
 
 __all__ = [
     "ActividadEvento",
     "AdminEvento",
+    "AgendaItem",
+    "Aviso",
+    "AvisoNota",
     "Base",
     "Bono",
     "Calificacion",
@@ -46,6 +50,7 @@ __all__ = [
     "CaptacionEvento",
     "Cierre",
     "Comision",
+    "Comunicado",
     "ConfigEvento",
     "ConfigSeccion",
     "CompensacionConfig",
@@ -80,4 +85,5 @@ __all__ = [
     "Solicitud",
     "User",
     "UserActividad",
+    "UserCambio",
 ]

@@ -11,6 +11,7 @@ from app.schemas.user import (
     ActividadesUpdate,
     ActividadEventoRead,
     FuncionUpdate,
+    UserCambioRead,
     UserCreate,
     UserRead,
     UserUpdate,
@@ -75,6 +76,22 @@ def set_activities(
 @router.get("/{user_id}/activities/history", response_model=list[ActividadEventoRead])
 def activity_history(user_id: uuid.UUID, db: DbSession, _: Manager) -> list[ActividadEvento]:
     return service.activity_history(db, _get_or_404(db, user_id))
+
+
+@router.get("/{user_id}/cambios", response_model=list[UserCambioRead])
+def cambios(user_id: uuid.UUID, db: DbSession, _: Manager) -> list[dict]:
+    """Personal data changes: field, before and after, who and when."""
+    return [
+        {
+            "campo": c.campo,
+            "campo_txt": service.CAMPO_LABELS.get(c.campo, c.campo),
+            "antes": c.antes,
+            "despues": c.despues,
+            "actor_name": c.actor.full_name if c.actor else None,
+            "created_at": c.created_at,
+        }
+        for c in service.cambios(db, _get_or_404(db, user_id))
+    ]
 
 
 @router.post("/{user_id}/funcion", response_model=UserRead)

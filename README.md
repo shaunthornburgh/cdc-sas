@@ -55,7 +55,11 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
     ├── pages/preoperacionales.vue # Team review for Coordinación / Gerencia (K09)
     ├── pages/movimientos.vue      # Movimientos y GPS: alerts, justification, field work (K05, M05, K16, C09)
     ├── pages/plataformas.vue      # Plataformas tradicionales: updates, plans, results, history (K15)
-    └── pages/configuracion.vue    # Configuración: brand, pay dates, rates, alerts, lead rules (Z02)
+    ├── pages/configuracion.vue    # Configuración: brand, pay dates, rates, alerts, lead rules (Z02)
+    ├── pages/avisos.vue           # Avisos y agenda / Notificaciones: bell, resumen, agenda, comunicados (G09, M10, C05)
+    ├── pages/agenda.vue           # Agenda / Mi agenda: one view per person, assign, answer (G09, K19, M17, C07, X06)
+    ├── pages/perfil.vue           # Mi perfil: photo, data, password (Z01, M11)
+    └── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
 ```
 
 ## Ports
@@ -212,7 +216,8 @@ The frontend keeps both tokens in cookies, so server rendering and route middlew
 | `GET  /users` | `?q=&cargo=&is_active=` | List with cargo, activities, funcion |
 | `GET  /users/{id}` | | |
 | `POST /users` | `{email, password, full_name, cargo, funcion?, actividades?, is_active?}` | 201; duplicate email gives 409 |
-| `PATCH /users/{id}` | any of `{full_name, cargo, is_active, funcion}` | Partial; `funcion: null` clears it |
+| `PATCH /users/{id}` | any of `{full_name, cargo, is_active, funcion, telefono, documento, fecha_ingreso}` | Partial; `funcion: null` clears it; personal data changes go to `user_cambios` |
+| `GET  /users/{id}/cambios` | | Personal data changes: before, after, who and when |
 | `POST /users/{id}/activities` | `{actividades: [...]}` | Replaces the full set |
 | `GET  /users/{id}/activities/history` | | Who switched each activity on or off, and when |
 | `POST /users/{id}/funcion` | `{funcion: "pre_ventas" \| "atencion_cliente" \| null}` | |
@@ -951,6 +956,242 @@ Endpoints (`/api/v1/configuracion`):
 - `PUT /marca` · `POST /marca/restaurar` · `PUT /pagos`
 - `PUT /tarifas` · `PUT /automatizaciones` · `PUT /idioma` · `PUT /leads` (partial updates)
 - `PUT /pendientes/{clave}` (`{resuelto}`) · `POST /uso-real`
+
+## Avisos (`/avisos`, G09 · M10 · C05)
+
+**Prototype note**: G09 «Avisos y agenda» (Gerencia) and M10 / C05 «Notificaciones» (asesor, Atención)
+aren't a bulletin board. An aviso says **what happened, what to do, until when, and has the button to
+do it**. Decisions: the bell only gets what asks for an action with a deadline; informative notices
+go to «Resumen del día»; no aviso repeats. Rules are in `backend/app/services/avisos.py`.
+
+**Model**:
+- `avisos`: one notice for one person. `origen` is `sistema` (generated, with a `clave` per event,
+  unique per person) or `comunicado`. It stores the chip, level, title, detail, «qué debes hacer»,
+  deadline, link + button text, G09's data boxes, `requiere_accion` (bell vs. resumen), status
+  (por atender / atendido, by hand or resolved on its own) and `leido_at`.
+- `aviso_notas`: «Agregar nota». `comunicados`: announcements; each copy is an aviso and its
+  `leido_at` is the read receipt. `agenda_items`: «Mi agenda».
+
+**System avisos**: generated when the person opens the page or the bell polls (every minute). Each
+generator returns what is pending now. A new event creates an aviso, a pending one is refreshed, and
+one whose event is gone closes itself as «✓ Resuelto». Attended by hand stays attended.
+| Aviso | Who gets it | Closes on its own when |
+|-------|-------------|------------------------|
+| Lead sin responsable (after the minutes set in Configuración) | Coordinación | someone takes the lead |
+| Nuevo lead (last 3 days, no responsable) | Atención y Preventa | same |
+| Cita por aceptar | the asesor | accepted / rejected |
+| Cita rechazada | Coordinación; Atención for its own leads | reassigned / cancelled |
+| Justificar (GPS alert) | the person | justified (or the deadline passes) |
+| Justificación por revisar | Coordinación (asesores, Atención) / Gerencia (Coordinador) | reviewed |
+| Captación por verificar (warn after 24 h) | Coordinación | verified |
+| Novedad del preoperacional | Coordinación | reviewed |
+| Plataforma atrasada | its responsable (Coordinación if none) | updated |
+| Salarios por confirmar / por aprobar | Auxiliar / Gerencia | confirmed / paid |
+| Comisiones y bonos (visto bueno / aprobar / pagar) | Auxiliar / Gerencia | the next step is done |
+| Área por debajo del 60 % (weekly) | Gerencia | — Gerencia closes it |
+| Actividad asignada (someone put it in your agenda) | the owner of the agenda | done, rejected or justified |
+| Ausencias y permisos del mes (informative) | Gerencia | — («Resumen del día») |
+
+**Actions on an aviso** (G09): the button to go and do it, «Agregar nota», «Agendar en mi agenda»
+(creates the agenda item and leaves a note), «Marcar como atendido» and «Abrir de nuevo».
+
+**Comunicados** (requested; not in the prototypes): Gerencia sends to any cargo, Coordinación to
+asesores and Atención y Preventa. «Alta» goes to the bell («Léelo y márcalo como atendido»);
+«normal» goes to «Resumen del día». They can stop showing after a date. Showing it in «Resumen del
+día» or attending it marks it read; «Avisos enviados» shows «Leído por N de M» and who. Gerencia
+sees every comunicado, Coordinación its own.
+
+**Navigation**: «Avisos y agenda» (Gerencia) / «Notificaciones» (everyone else) right under Inicio
+in the sidebar, with a red badge of what is «Por atender». On the phone, a bell with the badge in the
+top bar. Everyone has the page; each person only sees their own avisos and agenda.
+
+**Simplifications**:
+- «Mi agenda» is the Agenda module below (`/agenda`, and the tab in «Avisos y agenda»).
+- The area check uses the month so far (the previous month during the first week), not the last
+  calendar week: rendimiento has no weekly cut. It runs at most once per ISO week.
+- Avisos are generated on request, not by a background job: no push, sound or email. Reminders at
+  the time of an agenda item, the 7:30 summary and escalation (Configuración) wait for that job.
+- Accept / reject a cita, «Seguir lead» and similar act on their own pages: the aviso's button
+  takes you there, instead of confirming inside the notification as on M10.
+- G09's «Integración» aviso isn't generated: Integraciones doesn't exist yet.
+
+Endpoints (`/api/v1/avisos`):
+- `GET /conteo` (the bell: `por_atender`, `resumen_sin_leer`, `agenda_hoy`) · `GET ?vista=por_atender|atendidos|resumen`
+- `POST /{id}/atender` (`{nota?}`) · `POST /{id}/reabrir` · `POST /{id}/notas` · `POST /{id}/agendar` · `POST /leidos` (`{ids}`)
+- `GET|POST /comunicados` (`{titulo, cuerpo, audiencia[], prioridad, expira_el?}`) · `GET /opciones`
+
+The seed (`seed_avisos`) sends two comunicados (Gerencia «alta» to everyone; Coordinación «normal» to
+asesores and Atención), some already read, and puts G09's example activities in each person's
+agenda. System avisos come from the demo data the first time each person opens the page.
+
+## Agenda (`/agenda`, G09 · M17 · C07 · X06 · K19)
+
+Decisions G-088 («Agendas con jerarquía»), G-089 («Agenda sencilla y dinámica») and G-090 (tasks
+«Atrasada»). Rules are in `backend/app/services/agenda.py`; the page is `components/AgendaView.vue`,
+used by `/agenda` and by the «Mi agenda» tab of «Avisos y agenda».
+
+**One view per person** that joins what the system puts there with activities added by hand:
+| Colour (legend) | What | From |
+|-----------------|------|------|
+| Cita | citas of the asesor; for Atención also the citas of its leads | Citas |
+| Seguimiento | follow-ups of the leads assigned to the person | Leads |
+| Vencimiento | open pedidos whose deadline falls that day | Pedidos |
+| Control e inventario | visita de control and inventario citas | Citas |
+| Agregada por la persona / Asignada por otra persona | activities added by hand | `agenda_items` |
+
+System items are read-only. «Abrir ›» only shows in your own agenda.
+
+**Who sees which agenda** (G-088): each person their own; Coordinación also asesores' and Atención
+y Preventa's; Gerencia and the Auxiliar everyone's. Asesores and Atención only see their own (between
+asesores nothing is seen or touched).
+
+**Who adds in which agenda**: each person in their own; Coordinación in asesores' and Atención's;
+Gerencia in all; the Auxiliar in all but Gerencia's.
+
+**Activity statuses**: Pendiente · **Atrasada** (pending and its date/time passed) · ✓ Hecha ·
+Rechazada · Justificada.
+
+**What can be done** (shown in the detail when you tap an activity):
+- The owner of the agenda marks it **hecha** (if pending).
+- What **someone else** put can't be deleted by the owner: it's **rejected** or **justified**, with
+  a mandatory reason. Whoever put it gets an aviso in «Resumen del día» («Juan rechazó «…» · Motivo:
+  …», or «marcó hecha»).
+- Each person only **deletes** what they put (also in someone else's agenda). It stays in
+  «Actividades eliminadas» (the small link at the bottom) with who deleted it and when, and who had
+  put it and when.
+- When someone puts an activity in your agenda you get «Actividad asignada» in the bell; it closes
+  on its own once you answer it.
+
+**Top bar** (G-089, the same in every agenda): «Agenda de [persona]» (only for whoever can see other
+agendas), ‹ › and «Hoy», Día / Semana, «+ Agregar». The week starts today (seven days). «Agregar»
+asks in which agenda (only the allowed ones), the activity, date, time, priority and note.
+
+**Navigation**: «Agenda» (Coordinación) / «Mi agenda» (everyone else) under «Notificaciones» in the
+sidebar, with a grey badge of today's pending activities. Gerencia has it in «Avisos y agenda»
+(G-089) and can also open `/agenda`. «Agendar en mi agenda» from an aviso adds to your own agenda.
+
+**Simplifications**:
+- Rutas, firmas, pólizas and other system items the prototypes show (M17's «Ruta del coordinador»,
+  X06's firmas / pólizas / salarios) aren't there: those modules don't exist yet, or (salaries,
+  commissions) already come as avisos.
+- No reminder at the time of each activity and no Google Calendar / Outlook sync: they need the
+  background job and Integraciones.
+- An activity can't be edited: delete it and add it again (only what you put). Dates in the past
+  aren't accepted.
+- The deleted list shows the last 20 for that agenda.
+
+Endpoints (`/api/v1/agenda`):
+- `GET /personas` (the agendas you can see, yours first, with whether you can add in each)
+- `GET ?user_id=&desde=&hasta=` (items, deleted, legend; default 7 days from today, max six weeks)
+- `POST` (`{para_id?, titulo, fecha, hora?, prioridad, nota?}`)
+- `POST /{id}/hecha` · `POST /{id}/rechazar` (`{motivo}`) · `POST /{id}/justificar` (`{motivo}`) · `DELETE /{id}`
+
+The seed (`seed_agenda`) adds G09's activities between people: Coordinación → asesores and Atención,
+the Auxiliar → an asesor, Gerencia → Coordinación and the Auxiliar. One was rejected with a reason
+and one deleted by whoever put it. Personal activities come from `seed_avisos`.
+
+## Mi perfil (`/perfil`, Z01 · M11)
+
+Built from Z01 (Atención), Z01-coord, Z01-aux, Z01-ger and M11 (asesor, phone), and the decision
+«Foto y nombre en el perfil». Rules are in `backend/app/services/perfil.py`.
+
+**What the person can change** (the decision): **their photo** and **their password**. The name and
+the other personal data (teléfono, cédula, fecha de ingreso) are changed only by Coordinación or
+Gerencia in «Usuarios» (same rules as before: Coordinación can't touch Gerencia's users). Every
+change is logged with the value before and after, who and when. The page says it in each cargo's
+words: «Tu nombre lo cambia Gerencia», «…los cambian Coordinación o Gerencia; si algo está mal,
+avísale a tu coordinador».
+
+**New user fields**: `telefono`, `documento` (cédula), `fecha_ingreso`, `foto` (a data URL, loaded
+apart because it can be large) and `politica_aceptada_at`. **`user_cambios`** holds the history of
+name, cargo, status, teléfono, cédula, fecha de ingreso, photo and password changes. The cédula is
+stored only masked there, and the photo as «con / sin foto». «Usuarios» › «Editar datos» shows it.
+
+**Page** (as Z01):
+- Photo (or initials) with name and cargo, the activities (asesor), «Cambiar foto» / «Quitar foto».
+- «Mis datos»: área, correo (usuario), teléfono, fecha de ingreso, the row of each cargo
+  (Coordinador · Equipo a cargo · Reporta a · Acceso) and the cédula masked («••••••2210»). Asesores
+  also see their means of transport from their last preoperacional (M11).
+- «Mis resultados · [mes]» card for whoever has a result (asesores, Atención, Coordinación).
+- «Accesos rápidos» (M11): resultados, pagos y bonos, preoperacional, agenda.
+- «Seguridad»: change password, «Cerrar sesión» (with confirmation), and the data policy acceptance
+  date (or a button to accept it).
+
+**Navigation**: the name card at the top of the sidebar shows the photo and opens «Mi perfil»
+(decision «Foto visible…»). There's also «Mi perfil» next to «Cerrar sesión», and on the phone the
+avatar in the top bar opens it.
+
+**Simplifications**:
+- **Password**: the prototype sends a link to the email; there is no email service, so it's changed
+  on the page with the current password (minimum 8 characters, different from the current one and
+  from the email). Other open sessions aren't closed.
+- The photo is stored in the database as an image (JPG, PNG or WebP, < 300 KB). There's no file
+  storage or cropping.
+- The data policy text itself isn't in the app: only the date it was accepted. Existing demo users
+  count as having accepted it on their start date.
+- «Coordinador» lists the active Coordinación users: there are no teams per coordinator yet.
+
+Endpoints:
+- `GET /api/v1/perfil` · `GET|PUT /api/v1/perfil/foto` (`{foto}`; null removes it) ·
+  `POST /api/v1/perfil/password` (`{actual, nueva}`) · `POST /api/v1/perfil/politica`
+- `PATCH /api/v1/users/{id}` now also takes `telefono`, `documento` and `fecha_ingreso` (empty clears
+  them) · `GET /api/v1/users/{id}/cambios` (the history, Gerencia / Coordinación)
+
+The seed (`seed_perfil`) fills the demo users' teléfono, cédula and fecha de ingreso with the
+prototypes' example values.
+
+## Registro de cambios (`/trazabilidad`, G06)
+
+G06 «Registro de cambios» (the decisions renamed «Trazabilidad») and G06-coord: who did what, when,
+and how it was before and after. It can't be edited or deleted. Rules are in
+`backend/app/services/trazabilidad.py`.
+
+**It stores nothing new.** It reads the histories each module already keeps and the records that
+already say who did something and when, and shows them as one list, newest first:
+| Module (chip) | Read from |
+|---------------|-----------|
+| Leads · Citas · Seguimientos | `lead_eventos` (cita events → «Citas», seguimientos → «Seguimientos») |
+| Captaciones · Pedidos · Inmuebles · Administración | `captacion_eventos` · `pedido_eventos` · `inmueble_eventos` · `admin_eventos` |
+| Indicadores | `rendimiento_cambios` (pesos, metas, calificaciones) |
+| Usuarios | `actividad_eventos` (activities on/off) and `user_cambios` (name, cargo, status, personal data, photo, password) |
+| Ausencias | `novedades` (registered by / annulled by) |
+| Preoperacional | `preoperacionales` reviewed (who and when) |
+| GPS | `movimiento_eventos` (state before → after, location views, config, downloads) |
+| Plataformas | `plataforma_eventos` and `plataforma_actualizaciones` |
+| Agenda | `agenda_items` (added / assigned, answered, deleted) |
+| Avisos | `comunicados` sent |
+| Comisiones · Bonos · Pagos · Salarios · Negocios | `compensacion_eventos` (by entity) |
+| Configuración | `configuracion_eventos` (and this page's downloads) |
+
+Each row has Fecha, Hora, Usuario («Sistema» when nobody did it), Módulo, Acción, Registro (code or
+person, linked to its page) and Antes / Después (where the history keeps them; otherwise the detail).
+
+**Who**: Gerencia sees everything. Coordinación sees the operation of its team: it doesn't see
+Comisiones, Bonos, Pagos, Salarios, Negocios or Configuración (G06-coord; asking for them returns
+403). The Auxiliar and everyone else have no access (no prototype gives it to them).
+
+**Filters** (as G06): module chips, user, Desde / Hasta (last 7 days by default, at most a year),
+search by code or text (LD-, CIT-, NEG-, MOV-… or a name). 50 rows at a time with «Ver más».
+«Descargar (Excel)» gives a CSV with the current filters (up to 10.000 rows), and the download is
+logged (`configuracion_eventos`, section `registro_cambios`).
+
+**Navigation**: «Registro de cambios» in CONTROL Y AJUSTES (Coordinación and Gerencia), and a card in
+Configuración. G06's «Reportes e historial» doesn't exist yet, so the top button goes to Configuración.
+
+**Simplifications**:
+- Only what the modules already log is shown. Some actions don't leave a trace yet: creating a user,
+  changing a cita outside its lead's history, attending an aviso, deleting is mostly soft. The
+  prototype's «Permisos» chip isn't there: there are no per-cargo permissions to change.
+- Before / after come from each history as it was stored. Some keep only a text (the detail), and
+  compensación and configuración keep field names («iva pct: 19.0 → 18.0»).
+- The list is merged in memory, up to 3.000 rows per source in the range. That's enough for the
+  demo and a few months of real use; a large volume will need a database view or a shared table.
+- How long the records are kept: PENDIENTE DE CONFIGURACIÓN, as in G06.
+
+Endpoints (`/api/v1/registro-cambios`):
+- `GET /opciones` (modules this person can see, users, default range, scope note)
+- `GET ?desde=&hasta=&modulo=&usuario_id=&q=&offset=&limit=` (`items`, `total`)
+- `GET /export.csv` (same filters)
 
 ## Business rules
 

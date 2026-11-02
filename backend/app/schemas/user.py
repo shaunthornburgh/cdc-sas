@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, model_validator
@@ -18,6 +18,9 @@ class UserRead(BaseModel):
     actividades: list[ActividadComercial]
     gps_checkin_enabled: bool
     is_active: bool
+    telefono: str | None = None
+    documento: str | None = None
+    fecha_ingreso: date | None = None
 
 
 FullName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -40,6 +43,9 @@ class UserUpdate(BaseModel):
     cargo: Cargo | None = None
     is_active: bool | None = None
     funcion: FuncionIndependiente | None = None
+    telefono: str | None = Field(None, max_length=40)  # null or "" clears it
+    documento: str | None = Field(None, max_length=30)
+    fecha_ingreso: date | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -66,4 +72,15 @@ class ActividadEventoRead(BaseModel):
     activada: bool
     changed_by_id: uuid.UUID | None
     changed_by_name: str | None
+    created_at: datetime
+
+
+class UserCambioRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    campo: str
+    campo_txt: str
+    antes: str | None
+    despues: str | None
+    actor_name: str | None
     created_at: datetime

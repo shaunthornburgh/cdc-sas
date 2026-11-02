@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import type { Cargo, User, UserUpdate } from '~/types/auth'
+import type { Cargo, User, UserCambio, UserUpdate } from '~/types/auth'
 
-/** Inline "Editar datos" card: name and cargo. Status has its own buttons in the table. */
+/**
+ * Inline "Editar datos" card: name, cargo and personal data (teléfono, cédula, fecha de ingreso),
+ * with the change history. Only Coordinación / Gerencia change these; the person sees them in
+ * «Mi perfil». Status has its own buttons in the table.
+ */
 const props = defineProps<{ user: User }>()
 const emit = defineEmits<{ cancel: []; saved: [user: User] }>()
 
@@ -11,7 +15,21 @@ const isSelf = computed(() => props.user.id === auth.user.value?.id)
 const isGerencia = computed(() => auth.user.value?.cargo === 'gerencia')
 const cargoOptions = computed(() => CARGOS.filter((c) => c !== 'gerencia' || isGerencia.value))
 
-const form = reactive({ full_name: props.user.full_name, cargo: props.user.cargo as Cargo })
+const form = reactive({
+  full_name: props.user.full_name,
+  cargo: props.user.cargo as Cargo,
+  telefono: props.user.telefono ?? '',
+  documento: props.user.documento ?? '',
+  fecha_ingreso: props.user.fecha_ingreso ?? '',
+})
+const historial = ref<UserCambio[]>([])
+onMounted(async () => {
+  try {
+    historial.value = await users.cambios(props.user.id)
+  } catch {
+    historial.value = []
+  }
+})
 
 const firstField = ref<HTMLInputElement | null>(null)
 onMounted(() => firstField.value?.focus())
@@ -23,6 +41,9 @@ async function save() {
   const changes: UserUpdate = {}
   if (form.full_name.trim() !== props.user.full_name) changes.full_name = form.full_name
   if (form.cargo !== props.user.cargo) changes.cargo = form.cargo
+  if (form.telefono.trim() !== (props.user.telefono ?? '')) changes.telefono = form.telefono.trim() || null
+  if (form.documento.trim() !== (props.user.documento ?? '')) changes.documento = form.documento.trim() || null
+  if (form.fecha_ingreso !== (props.user.fecha_ingreso ?? '')) changes.fecha_ingreso = form.fecha_ingreso || null
   if (!Object.keys(changes).length) return emit('cancel')
 
   error.value = null
@@ -59,12 +80,34 @@ async function save() {
         </select>
       </div>
     </div>
+    <div class="g3">
+      <div class="fld">
+        <label for="ed-tel">Teléfono</label>
+        <input id="ed-tel" v-model="form.telefono" class="in" maxlength="40" inputmode="tel" placeholder="300 000 0000">
+      </div>
+      <div class="fld">
+        <label for="ed-doc">Cédula</label>
+        <input id="ed-doc" v-model="form.documento" class="in" maxlength="30" inputmode="numeric">
+      </div>
+      <div class="fld">
+        <label for="ed-ing">Fecha de ingreso</label>
+        <input id="ed-ing" v-model="form.fecha_ingreso" class="in" type="date" :max="localDate(0)">
+      </div>
+    </div>
     <div class="note">
+      La persona ve estos datos en «Mi perfil» (la cédula, oculta salvo los últimos 4 números) y solo cambia su foto y su contraseña.
       <template v-if="isSelf">No puedes cambiar tu propio cargo. </template>
       El correo es el usuario para entrar y no se cambia aquí. Las actividades y la función se configuran con el botón «Actividades».
     </div>
     <div v-if="error" class="note bad" role="alert"><b>{{ error }}</b></div>
     <div><button type="submit" class="btn bp" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar cambios' }}</button></div>
+    <div v-if="historial.length">
+      <div class="lbl">Cambios en sus datos</div>
+      <div v-for="(c, i) in historial" :key="i" class="hist">
+        <span class="mut">{{ fmtCuando(c.created_at) }}</span>
+        <span><b>{{ c.campo_txt }}</b>: {{ c.antes ?? '—' }} → {{ c.despues ?? '—' }}<span class="mut"> · {{ c.actor_name ?? 'sistema' }}</span></span>
+      </div>
+    </div>
   </form>
 </template>
 
@@ -76,5 +119,13 @@ async function save() {
 }
 .card-title {
   font-size: 18px;
+}
+.hist {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  font-size: 12.5px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--cdc-border-soft);
 }
 </style>

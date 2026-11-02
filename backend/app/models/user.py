@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func, true
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -29,6 +29,14 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         pg_enum(FuncionIndependiente, "funcion_independiente")
     )
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
+
+    # Mi perfil (Z01 / M11). The person only changes `foto`; Coordinación or Gerencia change the
+    # rest (each change goes to `user_cambios`).
+    telefono: Mapped[str | None] = mapped_column(String(40))
+    documento: Mapped[str | None] = mapped_column(String(30))  # cédula, shown masked
+    fecha_ingreso: Mapped[date | None] = mapped_column(Date)
+    foto: Mapped[str | None] = mapped_column(Text, deferred=True)  # data URL; loaded on demand
+    politica_aceptada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     actividad_links: Mapped[list["UserActividad"]] = relationship(
         back_populates="user",
@@ -104,3 +112,23 @@ class ActividadEvento(UUIDPrimaryKeyMixin, Base):
     @property
     def changed_by_name(self) -> str | None:
         return self.changed_by.full_name if self.changed_by else None
+
+
+class UserCambio(UUIDPrimaryKeyMixin, Base):
+    """History of personal data changes: field, value before and after, who and when (G-0xx
+    «Foto y nombre en el perfil»: cada cambio queda en trazabilidad)."""
+
+    __tablename__ = "user_cambios"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    campo: Mapped[str] = mapped_column(String(30))
+    antes: Mapped[str | None] = mapped_column(String(300))
+    despues: Mapped[str | None] = mapped_column(String(300))
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp(), nullable=False
+    )
+
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_id], lazy="joined")

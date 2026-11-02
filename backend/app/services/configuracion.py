@@ -65,6 +65,8 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "dias_seguidos": 3,
     },
     "produccion": {"resueltos": [], "uso_real": False, "uso_real_at": None, "uso_real_por": None},
+    # Internal: the ISO week the «área por debajo del 60 %» check last ran (avisos).
+    "avisos": {"semana_areas": None},
 }
 EDITABLES = ("marca", "tarifas", "automatizaciones", "idioma", "leads")
 SECCION_LABELS = {
@@ -75,6 +77,7 @@ SECCION_LABELS = {
     "leads": "Leads ganados y perdidos",
     "produccion": "Pendientes para salir a producción",
     "pagos": "Fechas de pago al personal",
+    "registro_cambios": "Registro de cambios",
 }
 OPCIONES = {
     "puntos_ganado": [0.5, 1.0, 1.5, 2.0],

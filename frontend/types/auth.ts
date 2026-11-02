@@ -18,6 +18,9 @@ export interface User {
   actividades: ActividadComercial[]
   gps_checkin_enabled: boolean
   is_active: boolean
+  telefono?: string | null
+  documento?: string | null
+  fecha_ingreso?: string | null
 }
 
 export interface TokenPair {
@@ -42,7 +45,16 @@ export type UserCreate = {
   is_active: boolean
 }
 
-export type UserUpdate = Partial<Pick<User, 'full_name' | 'cargo' | 'is_active' | 'funcion'>>
+export type UserUpdate = Partial<Pick<User, 'full_name' | 'cargo' | 'is_active' | 'funcion' | 'telefono' | 'documento' | 'fecha_ingreso'>>
+
+export interface UserCambio {
+  campo: string
+  campo_txt: string
+  antes: string | null
+  despues: string | null
+  actor_name: string | null
+  created_at: string
+}
 
 export interface ActividadEvento {
   actividad: ActividadComercial

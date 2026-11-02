@@ -2,8 +2,10 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     administracion,
+    agenda,
     asesor,
     auth,
+    avisos,
     captaciones,
     citas,
     compensacion,
@@ -15,9 +17,11 @@ from app.api.routes import (
     movimientos,
     novedades,
     pedidos,
+    perfil,
     plataformas,
     preoperacional,
     rendimiento,
+    trazabilidad,
     users,
 )
 
@@ -40,3 +44,7 @@ api_router.include_router(novedades.router)
 api_router.include_router(movimientos.router)
 api_router.include_router(plataformas.router)
 api_router.include_router(configuracion.router)
+api_router.include_router(avisos.router)
+api_router.include_router(agenda.router)
+api_router.include_router(perfil.router)
+api_router.include_router(trazabilidad.router)

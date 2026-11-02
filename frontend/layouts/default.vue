@@ -15,6 +15,25 @@ const gerencia = computed(() => user.value?.cargo === 'gerencia')
 const auxiliar = computed(() => user.value?.cargo === 'auxiliar_administrativa')
 const gps = computed(() => perfilGps(user.value))
 const home = computed(() => (manager.value ? '/coordinacion' : asesor.value ? '/asesor' : '/'))
+const { conteo, refrescar } = useAvisosConteo()
+const { foto, cargar: cargarFoto } = useMiFoto()
+// Someone else signs in on the same tab: forget the previous photo
+watch(
+  () => user.value?.id,
+  (id) => {
+    foto.value = undefined
+    if (id && import.meta.client) cargarFoto()
+  },
+)
+const nAvisos = computed(() => conteo.value?.por_atender ?? 0)
+let timer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  cargarFoto()
+  refrescar()
+  timer = setInterval(refrescar, 60_000)
+})
+onBeforeUnmount(() => clearInterval(timer))
+watch(() => route.path, () => refrescar())
 const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 </script>
 
@@ -30,12 +49,22 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         </div>
       </div>
 
-      <div v-if="user" class="role">
-        <span class="rav">{{ initials(user.full_name) }}</span>
-        <span>{{ user.full_name }} · <b>{{ CARGO_LABELS[user.cargo] }}</b></span>
-      </div>
+      <NuxtLink v-if="user" to="/perfil" class="role" aria-label="Mi perfil">
+        <img v-if="foto" :src="foto" alt="" class="rav rimg">
+        <span v-else class="rav">{{ initials(user.full_name) }}</span>
+        <span class="rname">{{ user.full_name }} · <b>{{ CARGO_LABELS[user.cargo] }}</b></span>
+        <span class="rcam" aria-hidden="true">›</span>
+      </NuxtLink>
 
       <NuxtLink class="nav" :class="{ on: isOn(home) }" :to="home">Inicio</NuxtLink>
+      <NuxtLink class="nav" :class="{ on: isOn('/avisos') }" to="/avisos">
+        {{ gerencia ? 'Avisos y agenda' : 'Notificaciones' }}
+        <span v-if="nAvisos" class="badge" :aria-label="`${nAvisos} por atender`">{{ nAvisos }}</span>
+      </NuxtLink>
+      <NuxtLink v-if="!gerencia" class="nav" :class="{ on: isOn('/agenda') }" to="/agenda">
+        {{ user?.cargo === 'coordinacion' ? 'Agenda' : 'Mi agenda' }}
+        <span v-if="conteo?.agenda_hoy" class="badge gray" :aria-label="`${conteo.agenda_hoy} pendientes hoy`">{{ conteo.agenda_hoy }}</span>
+      </NuxtLink>
       <NuxtLink v-if="conResultado" class="nav" :class="{ on: isOn('/resultados') && route.path === '/resultados' }" to="/resultados">Mis resultados</NuxtLink>
       <NuxtLink v-if="gerencia" class="nav" :class="{ on: isOn('/rendimiento-empresa') }" to="/rendimiento-empresa">Rendimiento de la empresa</NuxtLink>
       <NuxtLink v-if="!gerencia" class="nav" :class="{ on: isOn('/mis-pagos') }" to="/mis-pagos">Mis pagos y bonos</NuxtLink>
@@ -89,10 +118,12 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
 
       <template v-if="manager">
         <div class="sect">CONTROL Y AJUSTES</div>
+        <NuxtLink class="nav" :class="{ on: isOn('/trazabilidad') }" to="/trazabilidad">Registro de cambios</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/configuracion') }" to="/configuracion">Configuración</NuxtLink>
       </template>
 
       <div class="side-foot">
+        <NuxtLink class="nav" :class="{ on: isOn('/perfil') }" to="/perfil">Mi perfil</NuxtLink>
         <button type="button" class="nav nav-btn" @click="auth.logout()">Cerrar sesión</button>
       </div>
     </nav>
@@ -106,7 +137,16 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
           <div v-if="marca.lema" class="lema">{{ marca.lema }}</div>
         </div>
       </div>
-      <span v-if="user" class="av av-top" :title="user.full_name">{{ initials(user.full_name) }}</span>
+      <div class="row top-r">
+        <NuxtLink to="/avisos" class="bell" :aria-label="nAvisos ? `Avisos: ${nAvisos} por atender` : 'Avisos'">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          <span v-if="nAvisos" class="badge bdot">{{ nAvisos > 9 ? '9+' : nAvisos }}</span>
+        </NuxtLink>
+        <NuxtLink v-if="user" to="/perfil" class="av av-top" :title="`Mi perfil · ${user.full_name}`" aria-label="Mi perfil">
+          <img v-if="foto" :src="foto" alt="" class="topimg">
+          <template v-else>{{ initials(user.full_name) }}</template>
+        </NuxtLink>
+      </div>
     </header>
 
     <div class="main">
@@ -227,6 +267,34 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
   font-size: 12px;
   color: var(--cdc-avatar-bg);
 }
+.role {
+  text-decoration: none;
+}
+.role:hover {
+  background: var(--cdc-green-side-hover);
+}
+.rname {
+  flex: 1;
+  min-width: 0;
+}
+.rcam {
+  font-weight: 800;
+  color: var(--cdc-side-muted);
+}
+.rimg {
+  object-fit: cover;
+  padding: 0;
+}
+.topimg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.av-top {
+  text-decoration: none;
+  overflow: hidden;
+}
 .rav {
   width: 38px;
   height: 38px;
@@ -276,6 +344,41 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
 .side-foot {
   margin-top: auto;
   padding-top: 12px;
+}
+
+.badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #a3271b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.badge.gray {
+  background: var(--cdc-side-muted);
+  color: var(--cdc-green-dark);
+}
+.top-r {
+  gap: 10px;
+  align-items: center;
+}
+.bell {
+  position: relative;
+  display: inline-flex;
+  color: var(--cdc-text);
+  padding: 6px;
+}
+.bdot {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  margin: 0;
 }
 
 /* ---- Main ---- */
