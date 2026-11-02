@@ -282,8 +282,20 @@ def aplicar(db: Session, liq: LiquidacionSalario, mensual: int) -> None:
     for n in rows:
         dias[n.tipo] += dias_en(n, d1, d2)
     descontar = sum(dias[t] for t in NOVEDADES_DESCONTABLES)
-    liq.descuento = min(liq.salario_corte, round(mensual / DIAS_MES_SALARIO * descontar))
+    # Asistencia (G-048): impuntualidad and rejected early exits are discounted by the minute;
+    # accepted horas extra are listed (their value is PENDIENTE: contador).
+    from app.services import asistencia
+
+    min_desc, min_extra = asistencia.para_salario(db, liq.user_id, d1, d2)
+    por_minuto = mensual / DIAS_MES_SALARIO / asistencia.HORAS_DIA / 60
+    liq.descuento = min(
+        liq.salario_corte, round(mensual / DIAS_MES_SALARIO * descontar + por_minuto * min_desc)
+    )
     partes = [f"{TIPO_LABELS[t]} {_dias_txt(d)}" for t, d in dias.items() if d]
+    if min_desc:
+        partes.append(f"Impuntualidad {asistencia.dur_txt(min_desc)}")
+    if min_extra:
+        partes.append(f"Horas extra {asistencia.dur_txt(min_extra)} (valor pendiente)")
     liq.novedades = " · ".join(partes)[:300] or None
 
 

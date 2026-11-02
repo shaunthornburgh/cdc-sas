@@ -4,6 +4,7 @@ from app.api.routes import (
     administracion,
     agenda,
     asesor,
+    asistencia,
     auth,
     avisos,
     captaciones,
@@ -54,3 +55,4 @@ api_router.include_router(trazabilidad.router)
 api_router.include_router(integraciones.router)
 api_router.include_router(polizas.router)
 api_router.include_router(rutas.router)
+api_router.include_router(asistencia.router)

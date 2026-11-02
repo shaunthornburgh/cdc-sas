@@ -67,6 +67,26 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "produccion": {"resueltos": [], "uso_real": False, "uso_real_at": None, "uso_real_por": None},
     # Internal: the ISO week the «área por debajo del 60 %» check last ran (avisos).
     "avisos": {"semana_areas": None},
+    # G-048/G-050 · edited by the Auxiliar and Gerencia in «Asistencia» (services/asistencia.py)
+    "asistencia": {
+        "entrada_lv": "08:00",
+        "salida_lv": "18:00",
+        "entrada_sab": "08:00",
+        "salida_sab": "12:00",
+        "limite_min": 30,  # entrada can be marked up to N minutes after its hour (15/30/45/60)
+        "leve_max": 10,  # 1…N minutes late = leve; more = grave
+        "recordatorio_min": 5,  # «Recuerda marcar salida» N minutes before
+        "extra_min": 15,  # leaving N or more minutes after the hour = horas extra to review
+        "radio_zona_m": 2000,  # route zones have no address: radius around the zone's center
+        "exigir_preoperacional": True,
+        "marcan": {
+            "asesor": True,
+            "atencion_cliente": True,
+            "coordinacion": True,
+            "auxiliar_administrativa": True,
+            "gerencia": False,
+        },
+    },
 }
 EDITABLES = ("marca", "tarifas", "automatizaciones", "idioma", "leads")
 SECCION_LABELS = {
@@ -78,6 +98,7 @@ SECCION_LABELS = {
     "produccion": "Pendientes para salir a producción",
     "pagos": "Fechas de pago al personal",
     "registro_cambios": "Registro de cambios",
+    "asistencia": "Asistencia y puntualidad",
 }
 OPCIONES = {
     "puntos_ganado": [0.5, 1.0, 1.5, 2.0],

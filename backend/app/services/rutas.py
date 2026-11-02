@@ -586,14 +586,18 @@ def ubicaciones(db: Session, viewer: User) -> list[dict[str, Any]]:
     ).unique():
         zs = zonas_del_dia(db, u, hoy) if can_capture(u) else []
         rutas_vig = vigentes(db, u, hoy) if can_capture(u) else []
+        from app.services import asistencia
+
+        sede = asistencia.sede_de(db, u)
+        sede_txt = sede.nombre if sede else "Sede principal"
         if zs:
             donde, cls = "En ruta · " + " · ".join(dict.fromkeys(z.zona for z in zs)), "warn"
         elif rutas_vig:
-            donde, cls = "Oficina · Sede principal (hoy no tiene zona)", "ok"
+            donde, cls = f"Oficina · {sede_txt} (hoy no tiene zona)", "ok"
         elif u.cargo == Cargo.ASESOR and u.funcion is None:
-            donde, cls = "Oficina · Sede principal", "ok"
+            donde, cls = f"Oficina · {sede_txt}", "ok"
         else:
-            donde, cls = "Sede principal", "ok"
+            donde, cls = sede_txt, "ok"
         if can_capture(u):
             nota = None
         elif u.cargo == Cargo.ASESOR and u.funcion is None:

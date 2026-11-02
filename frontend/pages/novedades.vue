@@ -140,8 +140,7 @@ const fmtCel = (iso: string) => fmtCuando(iso)
 
 <template>
   <PageBar title="Ausencias y permisos" subtitle="Incapacidades y permisos · y lo que el personal reportó en el preoperacional" :back="aux ? '/' : '/coordinacion'">
-    <NuxtLink v-if="ger || aux" class="btn bs" to="/salarios">‹ Salarios del mes</NuxtLink>
-    <NuxtLink v-else class="btn bs" to="/preoperacionales">‹ Preoperacionales</NuxtLink>
+    <NuxtLink class="btn bs" to="/asistencia?tab=equipo">‹ Asistencia del día</NuxtLink>
     <button v-if="O?.puede_registrar && tab === 'a'" type="button" class="btn bp" @click="abrir">{{ form.on ? 'Cancelar' : '+ Registrar ausencia o permiso' }}</button>
   </PageBar>
 

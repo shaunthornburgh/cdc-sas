@@ -14,6 +14,7 @@ from app.models.enums import ActividadComercial as A
 from app.models.enums import Cargo, FuncionIndependiente
 from app.scripts.seed_administracion import seed_administracion
 from app.scripts.seed_agenda import seed_agenda
+from app.scripts.seed_asistencia import seed_asistencia
 from app.scripts.seed_avisos import seed_avisos
 from app.scripts.seed_captaciones import seed_captaciones
 from app.scripts.seed_compensacion import seed_compensacion
@@ -116,6 +117,8 @@ def main() -> None:
         print(f"  plataf.  {n} platform updates" if n else "  plataf.  already present, skipped")
         n = seed_rutas(db)
         print(f"  rutas    {n} routes" if n else "  rutas    already present, skipped")
+        n = seed_asistencia(db)
+        print(f"  asist.   {n} attendance records" if n else "  asist.   already present, skipped")
         n = seed_polizas(db)
         print(f"  pólizas  {n} policies" if n else "  pólizas  already present, skipped")
         n = seed_integraciones(db)

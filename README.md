@@ -62,7 +62,8 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
     ├── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
     ├── pages/integraciones.vue    # Integraciones: results per platform and connection data (G07)
     ├── pages/polizas.vue          # Pólizas: indicators, active contracts, studies, activation alerts, insurers, comparator (X11)
-    └── pages/rutas.vue            # Rutas: programming for Coordinación (X08, G-083) and «Mi ruta» for captadores (M04)
+    ├── pages/rutas.vue            # Rutas: programming for Coordinación (X08, G-083) and «Mi ruta» for captadores (M04)
+    └── pages/asistencia.vue       # Asistencia: marcar entrada y salida (Z04), team and reviews (K17), sedes y horario (X08)
 ```
 
 ## Ports
@@ -438,7 +439,7 @@ Gerencia and the Auxiliar don't have indicators yet (PENDIENTE DE CONFIGURACIÓN
 - Areas with no data (their module doesn't exist yet, or nothing to measure) don't count. The result
   uses the weight of the areas that have data, and the screen says so («calculado sobre el 65 %»).
 - 1–5 ratings have no weight: each 2 or 1 takes off 5 points. The preoperacional rating comes from
-  the preoperacional module. Puntualidad has no data until «Marcar entrada» exists.
+  the preoperacional module; Puntualidad from «Marcar entrada» (see Asistencia).
 - Atención y Preventa: +1 per lead ganado; −0.5 per lead perdido that «descuenta» (wrong numbers, and
   no contact after 3 calls on 3 days, don't).
 - Traffic light: verde 80–100 · amarillo 70–79 · naranja 60–69 · rojo < 60.
@@ -731,8 +732,7 @@ views.
   and the «Registro» column shows who registered each one and when.
 - Incapacidades are discounted as K13 says. The EPS / ARL reimbursement and its rules (who pays from
   which day) aren't modelled.
-- No «Asistencia del día» (K17) yet, so the top button goes to «Salarios del mes» (Gerencia,
-  Auxiliar) or «Preoperacionales» (Coordinación).
+- The top button goes to «Asistencia del día» (K17, see Asistencia).
 - K13's «Del preoperacional» also lists people who didn't do it today. That stays in
   «Preoperacionales» (K09).
 
@@ -1167,6 +1167,7 @@ already say who did something and when, and shows them as one list, newest first
 | Integraciones | `integracion_eventos` (data saved, tests, disconnections, settings) |
 | Pólizas | `poliza_eventos` (studies, decisions, signatures, activations, insurers and deadlines) |
 | Rutas | `ruta_eventos` (assigned, accepted / rejected, adjusted, cancelled, rated, arrivals) |
+| Asistencia | `asistencia_eventos` (entradas, salidas, reviews, sedes, assigned locations); the schedule and rules are under Configuración |
 | Configuración | `configuracion_eventos` (and this page's downloads) |
 
 Each row has Fecha, Hora, Usuario («Sistema» when nobody did it), Módulo, Acción, Registro (code or
@@ -1382,6 +1383,82 @@ Endpoints (`/api/v1/rutas`):
 - `POST` (with `reemplaza_id` to adjust a rejected one) · `POST /{id}/cancelar` ·
   `POST /{id}/responder` · `POST /{id}/calificar`
 - `GET /plantilla.csv` · `POST /importar` (`confirmar: false` reviews, `true` assigns)
+
+## Asistencia (`/asistencia`, Z04 · K17 · X08)
+
+Clock-in and clock-out (decisions G-048 … G-051). Rules are in `backend/app/services/asistencia.py`.
+One page, three tabs:
+- **Mi asistencia** (Z04), for whoever marks.
+- **Asistencia y ausencias** (K17), for Coordinación, the Auxiliar and Gerencia.
+- **Sedes y horario** (X08 part), edited by the Auxiliar and Gerencia.
+
+Sidebar: «Marcar entrada y salida» in MI DÍA (everyone but Gerencia; «Entrada» in the bottom bar),
+«Asistencia y ausencias» in EQUIPO / PERSONAL. «Ausencias y permisos» links back to it.
+
+**Data**: `sedes` (name, address, coordinates, radius 50/100/200 m, main one), `ubicaciones_asignadas`
+(each person's sede, who changed it and when), `marcaciones` (one per person and day: entrada and
+salida with location, state, minutes and reviews) and `asistencia_eventos` (Registro de cambios). The
+schedule and rules live in Configuración's store (section «asistencia»).
+
+**Who marks**: asesores, Atención, the Coordinador and the Auxiliar (switch per cargo; Gerencia off,
+G-050).
+
+**Marcar entrada** (one button, G-049):
+- The browser's location is checked against the assigned place:
+  - the person's sede (default the main one; Coordinación changes asesores' and Atención's, the
+    Auxiliar and Gerencia anyone's);
+  - for asesores with an **accepted route** that has zones today, the zone of that time (Rutas).
+- The **preoperacional comes first** for those who do it (switchable).
+- Up to 30 min after 8:00 (15/30/45/60). Late 1–10 min = leve, more = grave; both are
+  impuntualidad.
+- Outside the place, or with no location, a window asks «Cambio solicitado» / «Imprevisto» plus a
+  justification. Coordinación reviews it; the Coordinador's and the Auxiliar's go to Gerencia.
+  - Accepted: the marked hour counts.
+  - Rejected: the person gets «Marca entrada cuando estés en la sede o ubicación asignada» and can
+    mark again. Until they do it's impuntualidad, all day if they never do.
+
+**Marcar salida**:
+- Before the hour needs «Imprevisto» / «Permiso personal autorizado», reviewed by Coordinación or the
+  Auxiliar; rejected = the time not worked is discounted.
+- 15+ min after the hour = horas extra, accepted by Coordinación **and** the Auxiliar (both answer).
+- «Recuerda marcar salida» shows from 5 min before.
+
+**Asistencia y ausencias** (K17): today's KPIs (marked / total, pending, leves · graves and minutes
+in the range, accepted horas extra), «Por aprobar» with the actions each role can take, today's
+table (absences registered in Ausencias y permisos show as «Ausencia») and the range's records.
+The Auxiliar and Gerencia download the CSV.
+
+**Wired into**:
+- **Salarios**: unconfirmed pay periods discount impuntualidad and rejected early exits by the minute
+  (monthly salary ÷ 30 ÷ 8 h) and list accepted horas extra.
+- **Mis resultados**: the Puntualidad rating is now automatic (days on time ÷ days marked, on the
+  preoperacional's 1–5 scale) and a 2 or 1 takes off 5 points, as G-051 says.
+- **Avisos**: items to review for each reviewer; «Marca entrada cuando estés…» for a rejected entrada.
+- **Rutas**: the location table uses each person's sede.
+
+**Seed**: main sede (Guayabal) and «Punto de atención Envigado»; two weeks of entradas and salidas
+with the prototype's cases (leve, grave, outside accepted, rejected, horas extra accepted, early exit
+accepted). Today: most marked, Pre-ventas outside pending, Carla not marked; yesterday, Diego's horas
+extra and Bruno's early exit pending. DATOS DE EJEMPLO.
+
+**Simplifications**:
+- No map provider: a sede's coordinates are taken on site («Tomar mi ubicación») or typed. Route zones
+  use example centers with a configurable radius (2 km). «Otra zona» can't be checked.
+- With no sede registered, nobody's location can be checked, so marks are accepted «sin verificar».
+- Past the limit, a normal entrada can't be marked; the day stays «Sin marcar · impuntualidad» for
+  Coordinación to handle (absences go in Ausencias y permisos). Days without marking aren't
+  discounted by themselves.
+- The value of horas extra and surcharges is PENDIENTE (contador): they're listed, not paid. The
+  per-minute discount uses 8 hours a day until the contador confirms it.
+- The reminder is shown on the page (no push notification).
+- The Coordinador's dashboard and the Inicio pages don't show «Marcar entrada» yet; it's in the menu.
+
+Endpoints (`/api/v1/asistencia`):
+- `GET /mia` · `POST /entrada` · `POST /salida` (`{lat, lng, motivo?, texto?}`; without a needed
+  justification they answer `requiere_justificacion` and save nothing)
+- `GET /equipo?desde=&hasta=` · `POST /{id}/revisar` (`que`: entrada · salida · extra) ·
+  `GET /export.csv`
+- `GET /config` · `PUT /config` · `POST /sedes` · `PATCH /sedes/{id}` · `PUT /ubicacion/{user_id}`
 
 ## Business rules
 

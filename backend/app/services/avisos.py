@@ -803,6 +803,70 @@ def _ruta_cancelada(db: Session, u: User, now: datetime) -> list[Spec]:
     ][:MAX_POR_TIPO]
 
 
+@generador({"coordinacion", "auxiliar", "gerencia"}, "asistencia_por_aprobar")
+def _asistencia_por_aprobar(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-048: entradas outside the location, early exits and horas extra this person reviews."""
+    from app.models import Marcacion
+    from app.services import asistencia
+
+    if not asistencia.ve_equipo(u):
+        return []
+    ms = db.scalars(
+        select(Marcacion)
+        .where(
+            Marcacion.fecha >= fechas.local_date(now) - timedelta(days=45),
+            (Marcacion.entrada_estado == "por_aprobar")
+            | (Marcacion.salida_estado == "por_aprobar"),
+        )
+        .order_by(Marcacion.fecha.desc())
+    ).unique()
+    out = []
+    for m in ms:
+        if not asistencia.en_equipo(u, m.user):
+            continue
+        for a in asistencia._acciones(u, m):
+            if not a["puede"]:
+                continue
+            out.append(
+                Spec(
+                    clave=f"asistencia_por_aprobar:{m.id}:{a['que']}",
+                    tipo="asistencia_por_aprobar",
+                    tipo_txt=a["tipo"],
+                    nivel="warn",
+                    titulo=f"{a['tipo']}: {m.user.full_name} · {m.fecha:%d/%m}",
+                    detalle=f"{a['detalle']} · {a['justificacion']}",
+                    que_hacer="Acéptala o recházala en «Asistencia y ausencias».",
+                    link="/asistencia?tab=equipo",
+                    accion_txt="Revisar",
+                )
+            )
+    return out[:MAX_POR_TIPO]
+
+
+@generador({"gerencia", "coordinacion", "auxiliar", "atencion", "asesores"}, "entrada_rechazada")
+def _entrada_rechazada(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-048: «Marca entrada cuando estés en la sede o ubicación asignada»."""
+    from app.services import asistencia
+
+    m = asistencia.de_hoy(db, u, fechas.local_date(now))
+    if m is None or m.entrada_estado != "rechazada":
+        return []
+    return [
+        Spec(
+            clave=f"entrada_rechazada:{m.id}",
+            tipo="entrada_rechazada",
+            tipo_txt="Entrada rechazada",
+            nivel="bad",
+            titulo="Marca entrada cuando estés en la sede o ubicación asignada",
+            detalle=f"Tu ubicación asignada: {m.asignada}. Hasta que la registres se considera "
+            "impuntualidad y se descuenta del salario.",
+            que_hacer="Ve a tu ubicación asignada y marca entrada de nuevo.",
+            link="/asistencia",
+            accion_txt="Marcar entrada",
+        )
+    ]
+
+
 # ---------------------------------------------------------------- sync
 
 

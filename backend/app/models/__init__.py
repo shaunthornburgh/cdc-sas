@@ -8,6 +8,7 @@ from app.models.administracion import (
     Reparacion,
     Solicitud,
 )
+from app.models.asistencia import AsistenciaEvento, Marcacion, Sede, UbicacionAsignada
 from app.models.avisos import AgendaItem, Aviso, AvisoNota, Comunicado
 from app.models.captaciones import Captacion, CaptacionEvento
 from app.models.compensacion import (
@@ -45,6 +46,7 @@ __all__ = [
     "AdminEvento",
     "AgendaItem",
     "Aseguradora",
+    "AsistenciaEvento",
     "Aviso",
     "AvisoNota",
     "Base",
@@ -64,6 +66,7 @@ __all__ = [
     "InmuebleEvento",
     "Integracion",
     "IntegracionEvento",
+    "Marcacion",
     "Inventario",
     "InventarioAmbiente",
     "Lead",
@@ -83,6 +86,7 @@ __all__ = [
     "RutaEvento",
     "RutaLlegada",
     "RutaZona",
+    "Sede",
     "PlataformaActualizacion",
     "PlataformaEvento",
     "PlataformaPlan",
@@ -96,6 +100,7 @@ __all__ = [
     "SalarioConfig",
     "Seguimiento",
     "Solicitud",
+    "UbicacionAsignada",
     "User",
     "UserActividad",
     "UserCambio",

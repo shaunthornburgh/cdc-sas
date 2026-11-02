@@ -9,8 +9,8 @@ How the result is calculated (prototype v143 · DECISIONS G-0xx):
   don't count: the result is calculated over the weight of the areas that do have data, and the
   screen says so.
 * **Calificaciones (1 a 5)** have no weight: each 2 or 1 takes off 5 points. The preoperacional is
-  a rating calculated by the system (preoperacional.puntaje). Puntualidad needs «Marcar entrada»,
-  which doesn't exist yet, so it is shown without data.
+  a rating calculated by the system (preoperacional.puntaje); Puntualidad too, from «Marcar
+  entrada» (asistencia.puntualidad).
 * **Atención y Preventa**: each lead ganado adds 1 point; each lead perdido that «descuenta»
   (leads.perdida_descuenta) takes off 0.5. Gerencia changes both in Configuración.
 * **Semáforo**: verde 80–100 · amarillo 70–79 · naranja 60–69 · rojo < 60.
@@ -943,6 +943,25 @@ class Calculo:
             )
         return ajustes
 
+    def _puntualidad(self, user: User, p: Periodo) -> dict[str, Any]:
+        """G-051: calculated from «Marcar entrada» (asistencia.puntualidad), never by hand."""
+        from app.services import asistencia
+
+        base = {"key": "puntualidad", "titulo": "Puntualidad", "automatico": True, "fecha": None}
+        if not asistencia.marca(self.db, user):
+            return base | {"valor": None, "quien": "Su cargo no marca entrada", "que_hacer": ""}
+        r = asistencia.puntualidad(self.db, user, p.first, p.last)
+        return base | {
+            "valor": r["puntaje"],
+            "quien": (
+                f"Calculado por el sistema · a tiempo {r['a_tiempo']} de {r['dias']} días · "
+                f"{r['txt']}"
+                if r["puntaje"] is not None
+                else "Calculado por el sistema · sin marcaciones todavía"
+            ),
+            "que_hacer": "Marca entrada a tiempo y dentro de tu ubicación asignada.",
+        }
+
     def _coordinacion(self, user: User, areas: list[Area]) -> None:
         for a in areas:
             if a.key in SIN_MODULO:
@@ -1061,15 +1080,7 @@ class Calculo:
                 "que_hacer": "Haz el preoperacional todos los días antes de salir.",
                 "fecha": None,
             },
-            {
-                "key": "puntualidad",
-                "titulo": "Puntualidad",
-                "valor": None,
-                "automatico": True,
-                "quien": "Sin datos: se calcula con «Marcar entrada», que aún no existe",
-                "que_hacer": "",
-                "fecha": None,
-            },
+            self._puntualidad(user, p),
         ]
         for i in indicadores_de(user):
             c = rows.get(i.key)
