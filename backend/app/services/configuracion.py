@@ -135,9 +135,9 @@ PENDIENTES_MANUALES = [
     (
         "polizas",
         "Tipos de póliza, aseguradoras y recordatorios",
-        "Negocios y pólizas",
+        "Pólizas",
         "Gerencia",
-        None,
+        "/polizas",
     ),
 ]
 

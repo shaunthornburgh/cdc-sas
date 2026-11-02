@@ -156,6 +156,7 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
             { t: 'Rutas, GPS y tiempo detenido', d: 'Tiempo detenido (15, 20, 30 minutos u otro) y plazo para justificar.', to: '/movimientos', pend: 'Validación legal del GPS: pendiente' },
             { t: 'Plataformas tradicionales', d: 'Responsable, planes y cada cuántos días se actualizan.', to: '/plataformas' },
             { t: 'Integraciones', d: 'Resultados de cada plataforma y los datos para conectarla.', to: '/integraciones', pend: 'Conectores reales: pendientes' },
+            { t: 'Pólizas y aseguradoras', d: 'Aseguradoras, tipos de póliza y días para activar cada póliza.', to: '/polizas?tab=ase', pend: 'Aseguradoras y precios reales: pendientes' },
             { t: 'Registro de cambios', d: 'Quién hizo qué, cuándo, y cómo estaba antes y después, en todos los módulos.', to: '/trazabilidad' },
           ],
         },

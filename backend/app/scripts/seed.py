@@ -25,6 +25,7 @@ from app.scripts.seed_novedades import seed_novedades
 from app.scripts.seed_pedidos import seed_pedidos
 from app.scripts.seed_perfil import seed_perfil
 from app.scripts.seed_plataformas import seed_plataformas
+from app.scripts.seed_polizas import seed_polizas
 from app.scripts.seed_preoperacional import seed_preoperacional
 from app.scripts.seed_rendimiento import seed_rendimiento
 from app.services.users import create_user, get_user_by_email
@@ -112,6 +113,8 @@ def main() -> None:
         print(f"  admin.   {n} records" if n else "  admin.   already present, skipped")
         n = seed_plataformas(db)
         print(f"  plataf.  {n} platform updates" if n else "  plataf.  already present, skipped")
+        n = seed_polizas(db)
+        print(f"  pólizas  {n} policies" if n else "  pólizas  already present, skipped")
         n = seed_integraciones(db)
         print(f"  integr.  {n} integrations" if n else "  integr.  already present, skipped")
         n = seed_movimientos(db)

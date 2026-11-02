@@ -83,8 +83,13 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: route.path === '/inmuebles' }" to="/inmuebles">Inmuebles</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/inmuebles/administracion') }" to="/inmuebles/administracion">Administración de inmuebles</NuxtLink>
         <NuxtLink v-if="manager" class="nav" :class="{ on: isOn('/plataformas') }" to="/plataformas">{{ gerencia ? 'Plataformas tradicionales' : 'Actualización de plataformas' }}</NuxtLink>
+        <NuxtLink v-if="gerencia" class="nav" :class="{ on: isOn('/polizas') }" to="/polizas">Pólizas</NuxtLink>
       </template>
-      <template v-else-if="hasInmuebles">
+      <template v-if="auxiliar">
+        <div class="sect">NEGOCIOS</div>
+        <NuxtLink class="nav" :class="{ on: isOn('/polizas') }" to="/polizas">Pólizas</NuxtLink>
+      </template>
+      <template v-if="!hasPedidos && hasInmuebles">
         <div class="sect">INMUEBLES</div>
         <NuxtLink class="nav" :class="{ on: route.path === '/inmuebles' }" to="/inmuebles">Inmuebles</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/inmuebles/administracion') }" to="/inmuebles/administracion">Administración de inmuebles</NuxtLink>

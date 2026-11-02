@@ -85,10 +85,20 @@ MODULOS = [
     "Salarios",
     "Negocios",
     "Integraciones",
+    "Pólizas",
     "Configuración",
 ]
 SOLO_GERENCIA = frozenset(
-    {"Comisiones", "Bonos", "Pagos", "Salarios", "Negocios", "Integraciones", "Configuración"}
+    {
+        "Comisiones",
+        "Bonos",
+        "Pagos",
+        "Salarios",
+        "Negocios",
+        "Integraciones",
+        "Pólizas",
+        "Configuración",
+    }
 )
 MAX_POR_FUENTE = 3000
 MAX_DIAS = 366
@@ -742,6 +752,28 @@ def _integraciones(db: Session, r: Rango) -> list[Fila]:
         for e in db.scalars(
             _rango(q, IntegracionEvento.created_at, r, IntegracionEvento.actor_id)
         ).unique()
+    ]
+
+
+@fuente("Pólizas")
+def _polizas(db: Session, r: Rango) -> list[Fila]:
+    from app.models import PolizaEvento
+
+    q = select(PolizaEvento)
+    return [
+        Fila(
+            id=f"pol:{e.id}",
+            at=e.created_at,
+            actor_id=e.actor_id,
+            actor=_name(e.actor),
+            modulo="Pólizas",
+            accion=e.accion,
+            registro=e.registro,
+            antes=e.antes,
+            despues=e.despues,
+            link="/polizas",
+        )
+        for e in db.scalars(_rango(q, PolizaEvento.created_at, r, PolizaEvento.actor_id)).unique()
     ]
 
 

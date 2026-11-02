@@ -60,7 +60,8 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
     ├── pages/agenda.vue           # Agenda / Mi agenda: one view per person, assign, answer (G09, K19, M17, C07, X06)
     ├── pages/perfil.vue           # Mi perfil: photo, data, password (Z01, M11)
     ├── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
-    └── pages/integraciones.vue    # Integraciones: results per platform and connection data (G07)
+    ├── pages/integraciones.vue    # Integraciones: results per platform and connection data (G07)
+    └── pages/polizas.vue          # Pólizas: indicators, active contracts, studies, activation alerts, insurers, comparator (X11)
 ```
 
 ## Ports
@@ -1163,13 +1164,14 @@ already say who did something and when, and shows them as one list, newest first
 | Avisos | `comunicados` sent |
 | Comisiones · Bonos · Pagos · Salarios · Negocios | `compensacion_eventos` (by entity) |
 | Integraciones | `integracion_eventos` (data saved, tests, disconnections, settings) |
+| Pólizas | `poliza_eventos` (studies, decisions, signatures, activations, insurers and deadlines) |
 | Configuración | `configuracion_eventos` (and this page's downloads) |
 
 Each row has Fecha, Hora, Usuario («Sistema» when nobody did it), Módulo, Acción, Registro (code or
 person, linked to its page) and Antes / Después (where the history keeps them; otherwise the detail).
 
 **Who**: Gerencia sees everything. Coordinación sees the operation of its team: it doesn't see
-Comisiones, Bonos, Pagos, Salarios, Negocios, Integraciones or Configuración (G06-coord; asking for them returns
+Comisiones, Bonos, Pagos, Salarios, Negocios, Integraciones, Pólizas or Configuración (G06-coord; asking for them returns
 403). The Auxiliar and everyone else have no access (no prototype gives it to them).
 
 **Filters** (as G06): module chips, user, Desde / Hasta (last 7 days by default, at most a year),
@@ -1242,6 +1244,73 @@ Endpoints (`/api/v1/integraciones`):
 - `GET ?desde=&hasta=` (KPIs, groups with each item's summary and state)
 - `POST` (add) · `GET /{id}` (results, connection, history) · `PATCH /{id}` (cost, how, alert)
 - `PUT /{id}/datos` (save connection data) · `POST /{id}/probar` · `POST /{id}/desconectar`
+
+## Pólizas (`/polizas`, X11)
+
+X11 «Pólizas» (decisions G-087, G-075, G-072, G-084, G-034, F-020): rental policies, separate from
+«Negocios». **The Auxiliar administrativa and Gerencia** see and manage it; «Comparar pólizas» is
+only for Gerencia; everyone else gets 403. It's in the sidebar (Gerencia: COMERCIAL; Auxiliar:
+NEGOCIOS) and has a card in Configuración. Rules are in `backend/app/services/polizas.py`.
+
+**Data**: `aseguradoras` (name, NIT, contact, active, days to activate after the contract signature
+and warning days), `poliza_tipos` (each policy an insurer offers: price as % of the rent per month,
+study cost, response days, coverages), `polizas` and `poliza_eventos` (every change, with who and
+when; shown in «Registro de cambios»). **Only rentals** carry a policy: a policy belongs to a closed
+rental deal (`NEG-…`) and/or a rental property; older contracts can use a short description.
+
+**Flow**:
+1. «Registrar póliza» (insurer, type, canon, filing number) → **En estudio**.
+2. **Aprobada** or **Negada** (with the reason). When approved, the asesor who closed the deal gets
+   the G-034 aviso («Se aprobó la póliza del arriendo NEG-…»).
+3. A denied study can be retaken **once** with a reason (G-084). If the second study is approved it
+   counts as a **póliza recuperada**.
+4. «Registrar firma del contrato» starts the insurer's deadline.
+5. «Activar póliza» (date and policy number; supporting file marked as present) → **Activa**, in
+   «Contratos activos». Activating after the deadline is allowed and logged as «fuera del plazo».
+6. **Terminada** when the contract ends. Policies can be edited (canon, filing number, property
+   insurance; insurer only while in study) and deleted with a reason, except active ones.
+
+**Tabs** (as X11): Indicadores (active policies, monthly cost = canon × price, insured rent,
+activated in the Desde / Hasta range, to activate; table and bars by insurer), Contratos activos,
+**En trámite** (added, see below), Alertas de activación, Aseguradoras (list, add with the first
+policy, add more policies, deactivate, delete, deleted list, editable deadlines, recent changes) and,
+for Gerencia, Comparar pólizas (cards with price, cost for an example rent per month and first year,
+study cost and response, approval % of studies decided in the range, active policies, properties
+with insurance, insured rent, coverages; filters, sorting, side-by-side for 2 or 3 with the best of
+each row in green).
+
+**Alerts** (G-087): approved, signed and not active. «Por vencer» from the warning days, «Vencida»
+after the deadline. The Auxiliar gets both in Avisos; Gerencia only the expired ones.
+
+**Insurers**: names can't repeat; one used by any policy can't be deleted, only deactivated (G-087's
+proposed rule); a deleted one keeps who deleted it and when.
+
+**Seed**: the prototype's Entidad 1 / 2 / 3 (ejemplo) with 70 / 45 / 60 days and their five
+policies; the nine closed rental deals in every state (one expired and one about to expire, a denied
+one, a second study, two active…) and 12 older active contracts. DATOS DE EJEMPLO.
+
+**Simplifications**:
+- «Negocios» doesn't exist yet, so studies are registered and decided in the new **«En trámite»**
+  tab instead of the deal's page. When Negocios exists, these actions can move there.
+- The 2 points per recovered policy (G-084) aren't added: the Auxiliar has no result in
+  rendimiento yet. Recovered policies are recorded and counted in Indicadores.
+- **Reclamaciones** aren't recorded, so the comparator shows «No se registran todavía».
+- «Inmuebles con seguro» counts active policies marked «incluye seguro del inmueble»; the property
+  insurance isn't a separate record.
+- The supporting file isn't uploaded: there's no file storage yet, only a «hay soporte» flag.
+- How often the reminder repeats is PENDIENTE DE CONFIGURACIÓN, as in X11: the aviso stays open until
+  the policy is activated, and a new one appears when it expires.
+- The policy cost isn't deducted from each deal's ganancia (F-020): deal ganancia is still entered
+  by hand in Compensación.
+
+Endpoints (`/api/v1/polizas`):
+- `GET ?desde=&hasta=&aseguradora_id=` (KPIs, by insurer, active contracts, alerts, in progress)
+- `GET /opciones` (rental deals without a policy, rental properties, active insurers and types)
+- `GET /comparar?desde=&hasta=` (Gerencia)
+- `POST` · `GET /{id}` · `PATCH /{id}` · `POST /{id}/decidir` · `/retomar` · `/firma` · `/activar`
+  · `/terminar` · `/eliminar`
+- `GET /aseguradoras` · `POST /aseguradoras` · `PATCH /aseguradoras/{id}` ·
+  `POST /aseguradoras/{id}/tipos` · `DELETE /aseguradoras/{id}`
 
 ## Business rules
 

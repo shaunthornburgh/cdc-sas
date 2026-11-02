@@ -20,6 +20,7 @@ from app.api.routes import (
     pedidos,
     perfil,
     plataformas,
+    polizas,
     preoperacional,
     rendimiento,
     trazabilidad,
@@ -50,3 +51,4 @@ api_router.include_router(agenda.router)
 api_router.include_router(perfil.router)
 api_router.include_router(trazabilidad.router)
 api_router.include_router(integraciones.router)
+api_router.include_router(polizas.router)

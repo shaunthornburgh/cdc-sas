@@ -34,6 +34,7 @@ from app.models.plataformas import (
     PlataformaPlan,
     PlataformasConfig,
 )
+from app.models.polizas import Aseguradora, Poliza, PolizaEvento, PolizaTipo
 from app.models.preoperacional import Preoperacional, PreoperacionalConfig
 from app.models.rendimiento import Calificacion, RendimientoCambio, RendimientoConfig
 from app.models.user import ActividadEvento, User, UserActividad, UserCambio
@@ -42,6 +43,7 @@ __all__ = [
     "ActividadEvento",
     "AdminEvento",
     "AgendaItem",
+    "Aseguradora",
     "Aviso",
     "AvisoNota",
     "Base",
@@ -73,6 +75,9 @@ __all__ = [
     "Pago",
     "Pedido",
     "Plataforma",
+    "Poliza",
+    "PolizaEvento",
+    "PolizaTipo",
     "PlataformaActualizacion",
     "PlataformaEvento",
     "PlataformaPlan",

@@ -636,6 +636,62 @@ def _agenda_asignada(db: Session, u: User, now: datetime) -> list[Spec]:
     return out
 
 
+@generador({"gerencia", "auxiliar"}, "poliza_por_activar")
+def _poliza_por_activar(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-087: policies to activate within the insurer's deadline. The Auxiliar gets «por vencer»
+    and «vencida»; Gerencia only the expired ones."""
+    from app.services import polizas
+
+    out = []
+    for p, a in polizas.por_activar(db):
+        if a["st"] == "o" or (u.cargo == Cargo.GERENCIA and a["st"] != "v"):
+            continue
+        reg = polizas.registro(p)
+        vencida = a["st"] == "v"
+        out.append(
+            Spec(
+                clave=f"poliza_por_activar:{p.id}:{a['st']}",
+                tipo="poliza_por_activar",
+                tipo_txt="Póliza por activar",
+                nivel="bad" if vencida else "warn",
+                titulo=(
+                    f"Póliza vencida sin activar: {reg}"
+                    if vencida
+                    else f"Póliza por activar: {reg} · faltan {a['falta']} días"
+                ),
+                detalle=f"{p.aseguradora.nombre} · contrato firmado hace {a['dias']} días · "
+                f"plazo {p.aseguradora.dias_max} días",
+                que_hacer="Activa la póliza con la fecha y el número de póliza.",
+                limite_at=datetime.combine(a["max"], time(23, 59), tzinfo=fechas.BOGOTA),
+                link="/polizas?tab=ale",
+                accion_txt="Activar póliza",
+            )
+        )
+    return out[:MAX_POR_TIPO]
+
+
+@generador({"asesores"}, "poliza_aprobada", auto=False)
+def _poliza_aprobada(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-034: the policy of your rental was approved; the deal goes on."""
+    from app.services import polizas
+
+    out = []
+    for p in polizas.aprobadas_de(db, u, fechas.local_date(now) - timedelta(days=15)):
+        out.append(
+            Spec(
+                clave=f"poliza_aprobada:{p.id}:{p.estudios}",
+                tipo="poliza_aprobada",
+                tipo_txt="Póliza aprobada",
+                nivel="info",
+                titulo=f"Se aprobó la póliza del arriendo {p.cierre.code}",
+                detalle="El negocio sigue en proceso.",
+                que_hacer="Sigue con el cliente y coordina la firma del contrato.",
+                requiere_accion=False,
+            )
+        )
+    return out[:MAX_POR_TIPO]
+
+
 # ---------------------------------------------------------------- sync
 
 
