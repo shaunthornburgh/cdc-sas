@@ -86,6 +86,7 @@ MODULOS = [
     "Negocios",
     "Integraciones",
     "Pólizas",
+    "Rutas",
     "Configuración",
 ]
 SOLO_GERENCIA = frozenset(
@@ -774,6 +775,28 @@ def _polizas(db: Session, r: Rango) -> list[Fila]:
             link="/polizas",
         )
         for e in db.scalars(_rango(q, PolizaEvento.created_at, r, PolizaEvento.actor_id)).unique()
+    ]
+
+
+@fuente("Rutas")
+def _rutas(db: Session, r: Rango) -> list[Fila]:
+    from app.models import RutaEvento
+
+    q = select(RutaEvento)
+    return [
+        Fila(
+            id=f"rut:{e.id}",
+            at=e.created_at,
+            actor_id=e.actor_id,
+            actor=_name(e.actor),
+            modulo="Rutas",
+            accion=e.accion,
+            registro=f"{e.ruta.asesor.full_name} · {e.ruta.desde:%d/%m}–{e.ruta.hasta:%d/%m}",
+            antes=e.antes,
+            despues=e.despues,
+            link="/rutas?tab=list",
+        )
+        for e in db.scalars(_rango(q, RutaEvento.created_at, r, RutaEvento.actor_id)).unique()
     ]
 
 

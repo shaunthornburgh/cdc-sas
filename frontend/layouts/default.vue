@@ -11,6 +11,7 @@ const hasPedidos = computed(() => canUsePedidos(user.value))
 const hasInmuebles = computed(() => canUseInmuebles(user.value))
 const asesor = computed(() => !manager.value && hasCommercialActivity(user.value))
 const conResultado = computed(() => !!perfilRendimiento(user.value))
+const captador = computed(() => !manager.value && canCapture(user.value))
 const gerencia = computed(() => user.value?.cargo === 'gerencia')
 const auxiliar = computed(() => user.value?.cargo === 'auxiliar_administrativa')
 const gps = computed(() => perfilGps(user.value))
@@ -70,6 +71,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <NuxtLink v-if="!gerencia" class="nav" :class="{ on: isOn('/mis-pagos') }" to="/mis-pagos">Mis pagos y bonos</NuxtLink>
       <div class="sect">MI DÍA</div>
       <NuxtLink v-if="asesor" class="nav" :class="{ on: isOn('/mis-citas') }" to="/mis-citas">Mis citas</NuxtLink>
+      <NuxtLink v-if="captador" class="nav" :class="{ on: isOn('/rutas') }" to="/rutas">Mi ruta</NuxtLink>
       <NuxtLink class="nav" :class="{ on: route.path === '/preoperacional' }" to="/preoperacional">Mi preoperacional</NuxtLink>
       <NuxtLink v-if="gps && !manager" class="nav" :class="{ on: isOn('/movimientos') }" to="/movimientos">{{ gps === 'atencion' ? 'Trabajo en campo y GPS' : 'Mis alertas de GPS' }}</NuxtLink>
       <template v-if="hasLeads">
@@ -106,6 +108,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: isOn('/preoperacionales') }" to="/preoperacionales">Preoperacionales</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/novedades') }" to="/novedades">Ausencias y permisos</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/movimientos') }" to="/movimientos">Movimientos y GPS</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: isOn('/rutas') }" to="/rutas">{{ gerencia ? 'Rutas del equipo' : 'Rutas y ubicación del equipo' }}</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/equipo') || (isOn('/resultados/') && route.path !== '/resultados') }" to="/equipo">{{ gerencia ? 'Rendimiento por empleado' : 'Mi equipo' }}</NuxtLink>
         <NuxtLink class="nav" :class="{ on: route.path === '/rendimiento' }" to="/rendimiento">{{ gerencia ? 'Indicadores, metas y pesos' : 'Rendimiento e indicadores' }}</NuxtLink>
       </template>
@@ -119,6 +122,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: isOn('/equipo') || isOn('/resultados/') }" to="/equipo">Rendimiento y calificaciones</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/novedades') }" to="/novedades">Ausencias y permisos</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/plataformas') }" to="/plataformas">Actualización de plataformas</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: isOn('/rutas') }" to="/rutas">Rutas del equipo</NuxtLink>
       </template>
 
       <template v-if="manager">
@@ -164,6 +168,10 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <NuxtLink :class="{ on: isOn(home) }" :to="home">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>
         Inicio
+      </NuxtLink>
+      <NuxtLink v-if="captador" :class="{ on: isOn('/rutas') }" to="/rutas">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8" /></svg>
+        Mi ruta
       </NuxtLink>
       <NuxtLink v-if="asesor" :class="{ on: isOn('/mis-citas') }" to="/mis-citas">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>

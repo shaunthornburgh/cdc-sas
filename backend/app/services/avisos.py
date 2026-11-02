@@ -692,6 +692,117 @@ def _poliza_aprobada(db: Session, u: User, now: datetime) -> list[Spec]:
     return out[:MAX_POR_TIPO]
 
 
+@generador({"asesores"}, "ruta_por_aceptar")
+def _ruta_por_aceptar(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-083 «Nueva ruta asignada»: accept it or reject it with a reason."""
+    from app.models import Ruta
+    from app.services import rutas
+
+    rs = db.scalars(
+        select(Ruta)
+        .where(Ruta.asesor_id == u.id, Ruta.estado == "por_aceptar")
+        .order_by(Ruta.desde)
+        .limit(MAX_POR_TIPO)
+    ).unique()
+    return [
+        Spec(
+            clave=f"ruta_por_aceptar:{r.id}",
+            tipo="ruta_por_aceptar",
+            tipo_txt="Nueva ruta asignada",
+            nivel="warn",
+            titulo=f"Nueva ruta asignada: {rutas.periodo_txt(r)}",
+            detalle=f"{rutas.dias_txt(r.dias)} · {rutas.zonas_txt(r.zonas)}"
+            + (f" · «{r.observacion}»" if r.observacion else ""),
+            que_hacer="Acéptala o recházala eligiendo el motivo y explicándolo.",
+            limite_at=datetime.combine(r.desde, time(8, 0), tzinfo=fechas.BOGOTA),
+            link="/rutas",
+            accion_txt="Responder",
+        )
+        for r in rs
+    ]
+
+
+@generador({"coordinacion"}, "ruta_rechazada")
+def _ruta_rechazada(db: Session, u: User, now: datetime) -> list[Spec]:
+    """A rejected route waits to be adjusted and sent again (or left as is)."""
+    from app.models import Ruta
+    from app.services import rutas
+
+    rs = db.scalars(
+        select(Ruta)
+        .where(Ruta.estado == "rechazada", Ruta.hasta >= fechas.local_date(now))
+        .order_by(Ruta.respondida_at.desc())
+        .limit(MAX_POR_TIPO)
+    ).unique()
+    return [
+        Spec(
+            clave=f"ruta_rechazada:{r.id}",
+            tipo="ruta_rechazada",
+            tipo_txt="Ruta rechazada",
+            nivel="warn",
+            titulo=f"{r.asesor.full_name} rechazó la ruta del {rutas.periodo_txt(r)}",
+            detalle=f"{rutas.MOTIVOS.get(r.motivo or '', r.motivo)} · «{r.motivo_texto}»",
+            que_hacer="Ajústala según el motivo y vuelve a enviarla, o cancélala.",
+            link="/rutas?tab=list",
+            accion_txt="Ajustar y volver a enviar",
+        )
+        for r in rs
+    ]
+
+
+@generador({"coordinacion"}, "ruta_aceptada", auto=False)
+def _ruta_aceptada(db: Session, u: User, now: datetime) -> list[Spec]:
+    from app.models import Ruta
+    from app.services import rutas
+
+    rs = db.scalars(
+        select(Ruta).where(
+            Ruta.estado == "aceptada",
+            Ruta.creado_por_id == u.id,
+            Ruta.respondida_at >= now - timedelta(days=7),
+        )
+    ).unique()
+    return [
+        Spec(
+            clave=f"ruta_aceptada:{r.id}",
+            tipo="ruta_aceptada",
+            tipo_txt="Ruta aceptada",
+            nivel="info",
+            titulo=f"{r.asesor.full_name} aceptó la ruta del {rutas.periodo_txt(r)}",
+            detalle=rutas.zonas_txt(r.zonas),
+            requiere_accion=False,
+        )
+        for r in rs
+    ][:MAX_POR_TIPO]
+
+
+@generador({"asesores"}, "ruta_cancelada", auto=False)
+def _ruta_cancelada(db: Session, u: User, now: datetime) -> list[Spec]:
+    from app.models import Ruta
+    from app.services import rutas
+
+    rs = db.scalars(
+        select(Ruta).where(
+            Ruta.asesor_id == u.id,
+            Ruta.estado == "cancelada",
+            Ruta.motivo.is_(None),  # not a rejected one replaced by a new version
+            Ruta.cancelada_at >= now - timedelta(days=7),
+        )
+    ).unique()
+    return [
+        Spec(
+            clave=f"ruta_cancelada:{r.id}",
+            tipo="ruta_cancelada",
+            tipo_txt="Ruta cancelada",
+            nivel="info",
+            titulo=f"Coordinación canceló tu ruta del {rutas.periodo_txt(r)}",
+            detalle=rutas.zonas_txt(r.zonas),
+            requiere_accion=False,
+        )
+        for r in rs
+    ][:MAX_POR_TIPO]
+
+
 # ---------------------------------------------------------------- sync
 
 

@@ -61,7 +61,8 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
     ├── pages/perfil.vue           # Mi perfil: photo, data, password (Z01, M11)
     ├── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
     ├── pages/integraciones.vue    # Integraciones: results per platform and connection data (G07)
-    └── pages/polizas.vue          # Pólizas: indicators, active contracts, studies, activation alerts, insurers, comparator (X11)
+    ├── pages/polizas.vue          # Pólizas: indicators, active contracts, studies, activation alerts, insurers, comparator (X11)
+    └── pages/rutas.vue            # Rutas: programming for Coordinación (X08, G-083) and «Mi ruta» for captadores (M04)
 ```
 
 ## Ports
@@ -455,7 +456,7 @@ Gerencia and the Auxiliar don't have indicators yet (PENDIENTE DE CONFIGURACIÓN
 | Atención | Conversión · Cierres | Citas ÷ leads gestionados · leads ganados assigned to them | 40 % · 5 |
 | Coordinador | Resultados del equipo | Average result of asesores and Atención | weight 50 |
 | Coordinador | Monitoreo y seguimiento | Captaciones of the month verified within 24 h (more criteria pending) | weight 15 |
-| Coordinador | Plataformas · Rutas | No data until those modules exist | weights 20 · 15 |
+| Coordinador | Plataformas · Rutas | Days their platforms were up to date · average of Gerencia's 1–5 ratings of the routes they created (4 of 5 = 80 %) | weights 20 · 15 |
 
 **Avoiding double counts**: a won lead counts once for the asesor of its last realized visit (Ventas
 or Arriendos) and once for the Atención person it's assigned to (Cierres). These are different
@@ -1073,9 +1074,9 @@ sidebar, with a grey badge of today's pending activities. Gerencia has it in «A
 (G-089) and can also open `/agenda`. «Agendar en mi agenda» from an aviso adds to your own agenda.
 
 **Simplifications**:
-- Rutas, firmas, pólizas and other system items the prototypes show (M17's «Ruta del coordinador»,
-  X06's firmas / pólizas / salarios) aren't there: those modules don't exist yet, or (salaries,
-  commissions) already come as avisos.
+- Accepted route zones appear (M17's «Ruta del coordinador», see Rutas). Firmas, pólizas and other
+  system items X06 shows aren't there: firmas don't exist yet, and pólizas, salaries and
+  commissions already come as avisos.
 - No reminder at the time of each activity and no Google Calendar / Outlook sync: they need the
   background job and Integraciones.
 - An activity can't be edited: delete it and add it again (only what you put). Dates in the past
@@ -1165,6 +1166,7 @@ already say who did something and when, and shows them as one list, newest first
 | Comisiones · Bonos · Pagos · Salarios · Negocios | `compensacion_eventos` (by entity) |
 | Integraciones | `integracion_eventos` (data saved, tests, disconnections, settings) |
 | Pólizas | `poliza_eventos` (studies, decisions, signatures, activations, insurers and deadlines) |
+| Rutas | `ruta_eventos` (assigned, accepted / rejected, adjusted, cancelled, rated, arrivals) |
 | Configuración | `configuracion_eventos` (and this page's downloads) |
 
 Each row has Fecha, Hora, Usuario («Sistema» when nobody did it), Módulo, Acción, Registro (code or
@@ -1311,6 +1313,75 @@ Endpoints (`/api/v1/polizas`):
   · `/terminar` · `/eliminar`
 - `GET /aseguradoras` · `POST /aseguradoras` · `PATCH /aseguradoras/{id}` ·
   `POST /aseguradoras/{id}/tipos` · `DELETE /aseguradoras/{id}`
+
+## Rutas (`/rutas`, X08 · M04 · G-083)
+
+Field routes for asesores with Captación (G-002: route and GPS depend on Captación). One page with two
+views. Rules are in `backend/app/services/rutas.py`.
+
+**Data**: `rutas` (asesor, from / to, weekdays Mon–Sat, observation, origin manual / excel, state,
+rejection reason, rating), `ruta_zonas` (1 to 3 per route: zone, hours, weekdays), `ruta_llegadas`
+(arrival at a zone on a day) and `ruta_eventos` (history, in «Registro de cambios»). Zones are the
+same list as pedidos.
+
+**«Rutas y ubicación del equipo»** (X08):
+- **Coordinación** programs the routes in three tabs:
+  - **Asignar una por una**: asesor (only with Captación), period (day, week, month or range),
+    weekdays, and 1 to 3 zones with their hours and days.
+  - **Subir plantilla de Excel**: download the template, upload it, review row by row (rows with
+    errors aren't assigned) and assign the correct ones.
+  - **Rutas asignadas**: filters by dates, asesor and state; 5 at a time with «Ver más»; rejected
+    ones show the reason and can be adjusted and sent again (the old one is cancelled); pending and
+    accepted ones can be cancelled.
+- Validation (G-083):
+  - dates in order and not already over;
+  - at least one day, and zone days within the route days;
+  - end hour after start;
+  - no repeated zone, no overlapping hours the same day;
+  - no other pending or accepted route for that asesor in those dates (also between rows of one file).
+- **Gerencia** and the **Auxiliar** only consult (same filters). Gerencia rates accepted routes 1 to
+  5 (G-051).
+- «Ubicación y ruta de cada persona» shows where each person checks in today: «En ruta · zones» when
+  their accepted route has zones today, otherwise the main office. The Auxiliar and Gerencia can
+  download it.
+
+**«Mi ruta de hoy»** (M04, asesores with Captación; sidebar MI DÍA and bottom bar):
+- Routes to answer: accept, or reject with a reason and an explanation (both required).
+- The accepted routes, then a schematic map and today's timeline: route zones (with their arrival),
+  citas and pedido deadlines from the agenda.
+- «Marcar llegada al siguiente punto» records the arrival at the next zone, once per zone and day.
+
+**Wired into**:
+- **Avisos**: «Nueva ruta asignada» (asesor), «Ruta rechazada» (Coordinación, closes when adjusted
+  or cancelled), plus informative «Ruta aceptada» (Coordinación) and «Ruta cancelada» (asesor).
+- **Agenda**: accepted route zones appear in the asesor's agenda (green, «Ruta del coordinador»).
+- **Rendimiento**: the Coordinador's «Rutas del equipo» area is the average of Gerencia's ratings of
+  the routes they created that overlap the month (4 of 5 = 80 %); before, it had no data.
+- **Registro de cambios**: «Rutas» module (Coordinación and Gerencia).
+
+**Seed**: Asesor Demo has an accepted route this week (today's first arrival marked), a pending one
+for next week (from the template) and last week's, rated 5. Bruno has the whole month accepted with
+3 zones (rated 4) and a rejected one. DATOS DE EJEMPLO.
+
+**Simplifications**:
+- The «Excel» template is a **CSV** (`;`-separated) that Excel opens and saves; real `.xlsx` files
+  aren't read yet.
+- The map is a schematic drawing (as in M04), not a real map: there's no map provider yet
+  (Integraciones: Google Maps «Sin conectar»).
+- Arrivals are marked by hand; they aren't checked against the GPS position, and GPS alerts
+  («salida de ruta») still come from Movimientos y GPS, not from the zones.
+- Sedes, schedules, check-in radius and «Cambiar ubicación» belong to the attendance module, which
+  doesn't exist yet: the location table is read-only and comes from the accepted routes.
+- The real zone list and rejection reasons are PENDIENTE DE CONFIGURACIÓN (example values).
+- Coordinación can also cancel an accepted route that hasn't ended (G-083 only mentions pending
+  ones), so plans can change mid-period.
+
+Endpoints (`/api/v1/rutas`):
+- `GET /opciones` · `GET /mi-ruta` · `POST /llegada`
+- `GET ?desde=&hasta=&asesor_id=&estado=` · `GET /ubicaciones` · `GET /{id}`
+- `POST` (with `reemplaza_id` to adjust a rejected one) · `POST /{id}/cancelar` ·
+  `POST /{id}/responder` · `POST /{id}/calificar`
+- `GET /plantilla.csv` · `POST /importar` (`confirmar: false` reviews, `true` assigns)
 
 ## Business rules
 

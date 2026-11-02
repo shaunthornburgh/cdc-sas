@@ -47,6 +47,7 @@ const LEYENDA: [AgTipo, string][] = [
   ['seg', 'Seguimiento o pendiente'],
   ['ped', 'Vencimiento o requiere acción'],
   ['ctl', 'Control e inventario'],
+  ['ruta', 'Ruta del coordinador'],
   ['mia', 'Agregada por la persona'],
   ['asg', 'Asignada por otra persona'],
 ]

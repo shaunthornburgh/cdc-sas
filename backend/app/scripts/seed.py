@@ -28,6 +28,7 @@ from app.scripts.seed_plataformas import seed_plataformas
 from app.scripts.seed_polizas import seed_polizas
 from app.scripts.seed_preoperacional import seed_preoperacional
 from app.scripts.seed_rendimiento import seed_rendimiento
+from app.scripts.seed_rutas import seed_rutas
 from app.services.users import create_user, get_user_by_email
 
 DEFAULT_PASSWORD = "CasaDolce2026!"
@@ -113,6 +114,8 @@ def main() -> None:
         print(f"  admin.   {n} records" if n else "  admin.   already present, skipped")
         n = seed_plataformas(db)
         print(f"  plataf.  {n} platform updates" if n else "  plataf.  already present, skipped")
+        n = seed_rutas(db)
+        print(f"  rutas    {n} routes" if n else "  rutas    already present, skipped")
         n = seed_polizas(db)
         print(f"  pólizas  {n} policies" if n else "  pólizas  already present, skipped")
         n = seed_integraciones(db)

@@ -22,4 +22,5 @@ export const AG_COLOR: Record<string, string> = {
   ctl: '#2F6F9F',
   mia: '#0F766E',
   asg: '#C2410C',
+  ruta: '#00843D',
 }

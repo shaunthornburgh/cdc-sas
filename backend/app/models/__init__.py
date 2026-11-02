@@ -37,6 +37,7 @@ from app.models.plataformas import (
 from app.models.polizas import Aseguradora, Poliza, PolizaEvento, PolizaTipo
 from app.models.preoperacional import Preoperacional, PreoperacionalConfig
 from app.models.rendimiento import Calificacion, RendimientoCambio, RendimientoConfig
+from app.models.rutas import Ruta, RutaEvento, RutaLlegada, RutaZona
 from app.models.user import ActividadEvento, User, UserActividad, UserCambio
 
 __all__ = [
@@ -78,6 +79,10 @@ __all__ = [
     "Poliza",
     "PolizaEvento",
     "PolizaTipo",
+    "Ruta",
+    "RutaEvento",
+    "RutaLlegada",
+    "RutaZona",
     "PlataformaActualizacion",
     "PlataformaEvento",
     "PlataformaPlan",

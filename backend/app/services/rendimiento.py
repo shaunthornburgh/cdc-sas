@@ -218,9 +218,7 @@ AREAS: dict[str, AreaDef] = {
         ),
     )
 }
-SIN_MODULO = {
-    "rutas": "Sin datos: se califica cuando existan las rutas del equipo.",
-}
+SIN_MODULO: dict[str, str] = {}
 AREAS_ASESOR = (
     ("ventas", ActividadComercial.VENTAS),
     ("arriendos", ActividadComercial.ARRIENDOS),
@@ -963,6 +961,21 @@ class Calculo:
                 a.logrado, a.cumplimiento = round(prom, 1), round(prom)
                 a.meta_txt = "Promedio del equipo"
                 a.logrado_txt = f"{_n(prom)} % · {len(totals)} personas"
+            elif a.key == "rutas":
+                from app.services import rutas
+
+                c = rutas.cumplimiento_coordinador(self.db, user, self.p.first, self.p.last)
+                if c is None:
+                    a.sin_datos = "Sin rutas calificadas este mes: Gerencia las califica de 1 a 5."
+                    continue
+                prom, n = c
+                a.meta, a.meta_txt = (
+                    5,
+                    f"{n} ruta{'s' if n != 1 else ''} calificada{'s' if n != 1 else ''}",
+                )
+                a.logrado = round(prom, 1)
+                a.cumplimiento = round(prom * 20)
+                a.logrado_txt = f"{_n(prom)} de 5 en promedio"
             elif a.key == "plataformas":
                 c = plataformas.cumplimiento(self.db, user, self.p.first, self.p.last)
                 if c is None:

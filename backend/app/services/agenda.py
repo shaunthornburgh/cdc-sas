@@ -259,6 +259,11 @@ def sistema(db: Session, viewer: User, target: User, d1: date, d2: date) -> list
                 }
             )
 
+    if rt == "ase":
+        from app.services import rutas
+
+        out += rutas.agenda_items(db, target, d1, d2, propia=yo)
+
     peds = db.scalars(
         select(Pedido).where(
             Pedido.responsable_id == target.id,
