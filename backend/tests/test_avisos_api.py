@@ -15,6 +15,12 @@ from tests.conftest import auth_header, login
 AV = "/api/v1/avisos"
 
 
+def _hoy() -> date:
+    """Today in Bogotá, as the app counts it (the container's date is UTC: after 7 p. m. in
+    Bogotá it's already tomorrow)."""
+    return fechas.local_date(fechas.now())
+
+
 @pytest.fixture
 def p(make_user):
     return {
@@ -228,7 +234,7 @@ def test_comunicados_and_read_receipts(client, p, H, db):
     assert client.post(f"{AV}/comunicados", json=body, headers=H(p["juan"])).status_code == 403
     o = ok(client.get(f"{AV}/opciones", headers=H(p["coord"])))
     assert set(o["audiencias"]) == {"asesores", "atencion"}
-    pasado = (date.today() - timedelta(days=2)).isoformat()
+    pasado = (_hoy() - timedelta(days=2)).isoformat()
     bad = body | {"audiencia": ["asesores"], "expira_el": pasado}
     assert client.post(f"{AV}/comunicados", json=bad, headers=H(p["coord"])).status_code == 422
 
@@ -268,6 +274,6 @@ def test_comunicados_and_read_receipts(client, p, H, db):
     assert len(ok(client.get(f"{AV}/comunicados", headers=H(p["ger"])))) == 2
     assert len(ok(client.get(f"{AV}/comunicados", headers=H(p["coord"])))) == 1
     # Expired: hidden
-    db.query(Comunicado).update({"expira_el": date.today() - timedelta(days=1)})
+    db.query(Comunicado).update({"expira_el": _hoy() - timedelta(days=1)})
     db.flush()
     assert lista(client, H, p["aux"]) == [] and lista(client, H, p["juan"], "resumen") == []

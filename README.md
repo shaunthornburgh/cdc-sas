@@ -16,55 +16,66 @@ Monorepo for the operations platform for Casa Dolce Casa S.A.S. (real estate).
 ├── backend/
 │   ├── app/
 │   │   ├── main.py           # FastAPI app factory, CORS, routers
-│   │   ├── core/config.py    # Settings (pydantic-settings, reads backend/.env)
-│   │   ├── db/base.py        # Declarative Base + UUID/timestamp mixins
-│   │   ├── db/session.py     # Engine, SessionLocal, get_db dependency
-│   │   ├── api/router.py     # /api/v1 router
-│   │   ├── core/security.py  # argon2 hashing, JWT create/decode
-│   │   ├── core/token_store.py # Revoked tokens (Redis)
+│   │   ├── core/             # config.py (settings from backend/.env), security.py (argon2, JWT), token_store.py (revoked tokens in Redis)
+│   │   ├── db/               # Declarative Base, UUID/timestamp mixins, session, pg_enum
+│   │   ├── api/router.py     # /api/v1 router (one router per module)
 │   │   ├── api/deps.py       # DbSession, RedisClient, CurrentUser
 │   │   ├── api/permissions.py # require_cargo / require_actividad / require_funcion
-│   │   ├── api/routes/       # health, auth, users, leads, citas, captaciones, dashboard, asesor, preoperacional
-│   │   ├── models/           # User, UserActividad + domain enums
-│   │   ├── schemas/          # Pydantic request/response models
-│   │   ├── services/         # users, leads, citas, captaciones (business rules) + policies, errors
-│   │   └── scripts/          # seed.py (demo users) + seed_leads.py + seed_captaciones.py
+│   │   ├── api/routes/       # one file per module (thin: validate, call the service, commit)
+│   │   ├── models/           # SQLAlchemy models, one file per module + enums.py
+│   │   ├── schemas/          # Pydantic request bodies
+│   │   ├── services/         # business rules, one file per module (rules in each module's docstring)
+│   │   └── scripts/          # seed.py + seed_<module>.py (demo data)
 │   ├── alembic/              # Migrations (env.py reads app settings)
-│   ├── tests/
+│   ├── tests/                # API tests, one file per module (need Postgres)
 │   └── pyproject.toml
 └── frontend/
     ├── nuxt.config.ts        # runtimeConfig.public.apiBase
-    ├── assets/css/tokens.css # Design tokens (CSS variables, light/dark)
-    ├── layouts/default.vue   # Sidebar + content shell
-    ├── plugins/auth.ts       # Auth state, token cookies, authenticated fetch
-    ├── composables/          # useAuth(), useApi()
-    ├── middleware/auth.global.ts # Login required unless page is public
+    ├── assets/css/           # tokens.css (colours, fonts, radii) + main.css (prototype class names)
+    ├── layouts/default.vue   # Sidebar (desktop), top bar + bottom navigation (phone)
     ├── layouts/auth.vue      # Centered layout for /login
-    ├── components/UserDrawer.vue # Create / edit user panel + activity history
+    ├── middleware/auth.global.ts # Login required unless public; `cargos` page meta → 403
+    ├── plugins/auth.ts       # Auth state, token cookies, authenticated fetch with refresh
+    ├── composables/          # useAuth, useApi and one use<Module>() per module
+    ├── components/           # PageBar, ConfirmDialog, banners (PreopBanner, PausaBanner) and module pieces
+    ├── types/                # API types per module
+    ├── utils/                # labels, dates, permissions shared by pages
     ├── error.vue             # 403 / 404 / error page
-    ├── pages/login.vue
-    ├── pages/index.vue       # Dashboard: cargo, activities, GPS status
-    ├── pages/usuarios/       # User management (Gerencia, Coordinación)
-    ├── pages/leads/          # Atención y Preventa (C01) + lead detail (C02)
-    ├── pages/citas/          # Control de citas (C03)
-    ├── pages/captaciones/    # Verificar captaciones (K12) / Nueva captación (M15) + detail
-    ├── pages/coordinacion.vue # Coordinación / Gerencia · hoy (K01, phone K11)
-    ├── pages/asesor.vue      # Asesor home (M01 / M02)
-    ├── pages/mis-citas.vue   # Asesor's citas: accept, reject, take, close (M03)
-    ├── pages/preoperacional.vue   # Mi preoperacional: realizar hoy + historial y puntaje (M07 / C08)
-    ├── pages/preoperacionales.vue # Team review for Coordinación / Gerencia (K09)
-    ├── pages/movimientos.vue      # Movimientos y GPS: alerts, justification, field work (K05, M05, K16, C09)
-    ├── pages/plataformas.vue      # Plataformas tradicionales: updates, plans, results, history (K15)
-    ├── pages/configuracion.vue    # Configuración: brand, pay dates, rates, alerts, lead rules (Z02)
-    ├── pages/avisos.vue           # Avisos y agenda / Notificaciones: bell, resumen, agenda, comunicados (G09, M10, C05)
-    ├── pages/agenda.vue           # Agenda / Mi agenda: one view per person, assign, answer (G09, K19, M17, C07, X06)
-    ├── pages/perfil.vue           # Mi perfil: photo, data, password (Z01, M11)
-    ├── pages/trazabilidad.vue     # Registro de cambios: every module's history in one list (G06)
-    ├── pages/integraciones.vue    # Integraciones: results per platform and connection data (G07)
-    ├── pages/polizas.vue          # Pólizas: indicators, active contracts, studies, activation alerts, insurers, comparator (X11)
-    ├── pages/rutas.vue            # Rutas: programming for Coordinación (X08, G-083) and «Mi ruta» for captadores (M04)
-    └── pages/asistencia.vue       # Asistencia: marcar entrada y salida (Z04), team and reviews (K17), sedes y horario (X08)
+    └── pages/                # see «Modules» below
 ```
+
+## Modules
+
+Each module has its own section further down (rules, endpoints, demo data, simplifications). Prototype
+codes refer to `CDC_Software_Operativo/paginas/*.dc.html`; decisions (G-0xx) to its `DECISIONS.md`.
+
+| Module | Pages | Who | Prototypes |
+|--------|-------|-----|------------|
+| Login, Mi perfil | `/login`, `/perfil` | Everyone | Z01, M11 |
+| Inicio | `/` (general), `/asesor`, `/coordinacion` | Each cargo its own | M01, M02, K01, K11 |
+| Usuarios | `/usuarios` | Gerencia, Coordinación | G04 |
+| Atención y Preventa: leads y citas | `/leads`, `/leads/[id]`, `/citas` | Atención, Pre-ventas, managers | C01–C03 |
+| Mis citas | `/mis-citas` | Asesores | M03 |
+| Captaciones | `/captaciones` | Captadores, managers | K12, M15 |
+| Pedidos | `/pedidos` | Commercial team, managers | K06, C10 |
+| Inmuebles · Administración de inmuebles | `/inmuebles`, `/inmuebles/administracion` | Commercial team, Auxiliar, managers | X14 |
+| Negocios | `/negocios` | Auxiliar, Gerencia, Coordinación (no money), asesores (theirs) | X02, M16 |
+| Pólizas | `/polizas` | Auxiliar, Gerencia | X11 |
+| Preoperacional | `/preoperacional`, `/preoperacionales` | Everyone · reviewers | M07, C08, K09 |
+| Pausas activas | `/pausas-activas` (+ `?tab=equipo`), reminder in each Inicio | Everyone · Auxiliar, Coordinación, Gerencia | G11 |
+| Asistencia | `/asistencia` (+ `?tab=equipo`, `?tab=sedes`) | Everyone but Gerencia marks · team view | Z04, K17, X08 |
+| Ausencias y permisos | `/novedades` | Auxiliar, Coordinación, Gerencia | K13 |
+| Movimientos y GPS | `/movimientos` | GPS users · managers | K05, M05, K16, C09 |
+| Rutas | `/rutas` | Captadores (Mi ruta) · managers | X08, M04 |
+| Capacitaciones | `/capacitaciones` (+ `?tab=equipo`) | Everyone · Auxiliar, Coordinación, Gerencia | Z03, X07 |
+| Rendimiento | `/resultados`, `/resultados/[id]`, `/equipo`, `/rendimiento`, `/rendimiento-empresa` | Each person · managers · Gerencia | C04, K07, K14, K18, G12 |
+| Compensación | `/mis-pagos`, `/compensacion`, `/salarios` | Everyone (own) · Auxiliar, Gerencia | G05, X04, Z05, M12–M14 |
+| Descargas del personal | `/descargas` | Auxiliar, Gerencia, Coordinación (team) | X10 |
+| Plataformas tradicionales | `/plataformas` | Auxiliar, managers | K15 |
+| Integraciones | `/integraciones` | Gerencia | G07 |
+| Avisos · Agenda | `/avisos`, `/agenda` | Everyone | G09, M10, C05, M17, C07, X06, K19 |
+| Registro de cambios | `/trazabilidad` | Gerencia, Coordinación | G06 |
+| Configuración | `/configuracion` | Gerencia, Coordinación (its part) | Z02 |
 
 ## Ports
 
@@ -83,6 +94,20 @@ You can override any host port: `API_PORT=8200 POSTGRES_PORT=5433 docker compose
 - Docker Desktop
 - Node 20+ and pnpm (`npm i -g pnpm`)
 - Python 3.12+ (only if you run the API outside Docker: `brew install python@3.12`)
+
+## Quick start (everything in Docker)
+
+```bash
+cp backend/.env.example backend/.env
+docker compose --profile api up -d --build                     # Postgres, Redis, API (migrates on start)
+docker compose exec api python -m app.scripts.seed             # demo users + demo data for every module
+cd frontend && cp .env.example .env && pnpm install && pnpm dev   # http://localhost:3000
+```
+
+Log in with any of the test users below (password `CasaDolce2026!`). The seed only adds what's missing,
+so it's safe to run again. Demo dates are relative to the day you seed.
+
+To start the demo data from scratch: `docker compose --profile api down -v`, then the commands above.
 
 ## 1. Start Postgres + Redis
 
@@ -148,6 +173,18 @@ The dashboard at `/` shows the current user's cargo, activities and GPS check-in
 Other commands: `pnpm typecheck`, `pnpm build`, `pnpm preview`.
 
 > Use pnpm. `npm install` currently fails on npm 10 with `Cannot read properties of null (reading 'edgesOut')` while resolving Nuxt's peer dependencies.
+
+## Checks
+
+```bash
+docker compose exec api pytest                                         # 304 API tests (create a cdc_test database)
+docker compose exec api sh -c "ruff check . && ruff format --check ."  # lint + format
+cd frontend && pnpm typecheck && pnpm build                            # types + production build
+```
+
+Tests that depend on «today» pin the clock (`fechas.now`), so they pass any day of the week. A few
+use relative times («in 30 minutes») and could misbehave if run within minutes of midnight in Bogotá.
+Stop `pnpm dev` before `pnpm build` (Nuxt refuses to build while a dev server runs).
 
 ## Stop / reset
 
@@ -338,7 +375,7 @@ Built from prototypes K01-DashCoord (desktop) and K11-CoordCel (phone). Coordina
 - **Alertas en tiempo real:** most urgent first, built from live data, each with a link. On the phone each alert also has «Qué hacer».
 - **Atención y Preventa:** leads followed, first response (average minutes from a lead arriving to someone taking it), calls, follow-ups on time (marked done within 30 min of their time), citas scheduled and done, leads won and open leads.
 
-The prototype's tasks, pedidos, GPS alerts, preoperacional, attendance and rendimiento come from modules that don't exist yet, so they aren't shown. The tables leave room to add them.
+Pedidos and preoperacional were added to this dashboard by their own modules (see those sections). The prototype's tasks, GPS alerts, attendance and rendimiento tiles aren't on it: they live on their own pages (Agenda, Movimientos y GPS, Asistencia, Mi equipo).
 
 | Endpoint | Content |
 |----------|---------|
@@ -371,7 +408,7 @@ Everything is recorded in the lead's history. Atención and Coordinación can st
 | `GET /asesor/citas?asesor_id=` | The four lists + counts |
 | `POST /asesor/citas/{id}/aceptar` · `/rechazar` · `/tomar` · `/cerrar` | Only the asesor (managers can't do these for them) |
 
-The prototype's entrada/GPS, preoperacional, negocios, pedidos, rendimiento %, goals and pagos depend on modules that don't exist yet, so they aren't shown; the goal appears as «pendiente de configuración».
+The preoperacional banner, pedidos reminders, the pausa activa reminder and «Mi puntaje del mes» were added by their modules. The prototype's entrada/GPS, «negocios pendientes» and pagos aren't on the home: they're on their own pages (Asistencia, Mis negocios, Mis pagos y bonos).
 
 ## Preoperacional (`/preoperacional`, `/preoperacionales`)
 
@@ -436,7 +473,7 @@ Gerencia and the Auxiliar don't have indicators yet (PENDIENTE DE CONFIGURACIÓN
 **How it's calculated**
 - Result = Σ (cumplimiento × weight) + adjustments − deductions, shown from 0 to 100. One point is 1 %.
 - Cumplimiento = achieved ÷ goal, capped at 100 %. An area «cumple» at 100 %.
-- Areas with no data (their module doesn't exist yet, or nothing to measure) don't count. The result
+- Areas with no data (nothing recorded in the system, or nothing to measure) don't count. The result
   uses the weight of the areas that have data, and the screen says so («calculado sobre el 65 %»).
 - 1–5 ratings have no weight: each 2 or 1 takes off 5 points. The preoperacional rating comes from
   the preoperacional module; Puntualidad from «Marcar entrada» (see Asistencia).
@@ -532,10 +569,12 @@ discounted automatically (see Novedades below). There are no other deductions ye
 - **Coordinación sees only its own**, following DECISIONS (pay data is outside Coordinación's scope).
 
 **Simplifications** (to revisit when the related modules exist):
-- No deals module: the trigger is the lead «Ganado», and the ganancia is entered by hand.
+- The trigger is still the lead «Ganado». Since «Negocios» exists, the ganancia comes from the deal's value
+  and Gerencia's tariffs when the Auxiliar gives «negocio cerrado»; entering it by hand here still works
+  for deals without a value.
 - No partial commission payments for sales.
-- No clock-in yet: hours worked don't change the salary, and «Horas trabajadas» (X03) and
-  «Valor y productividad» (G08) aren't built. Absences do (Novedades).
+- Hours worked don't change the salary: Asistencia records entry and exit, but «Horas trabajadas»
+  (X03) and «Valor y productividad» (G08) aren't built. Absences do (Novedades).
 - No legal deductions (salud, pensión) or auxilio de transporte.
 - «Excel» downloads are CSV, and there's no PDF certificate yet.
 
@@ -817,7 +856,7 @@ full. Asesores with Captación and Atención y Preventa get it in MI DÍA and in
 - «Descargar (Excel)» downloads a CSV that Excel opens (same as Rendimiento).
 - No notifications: M05 opens from the bell in the prototype. Here the person sees their pending
   alerts on the page and as an aviso in «Mis resultados».
-- «Días en campo programados» (K16 / C09) isn't built: there's no agenda module yet.
+- «Días en campo programados» (K16 / C09) isn't built, and isn't part of the Agenda either.
 - Coordinación's page adds the registro and «Mi trabajo en campo» tabs to K05's single view, so it
   has the history and filters too and can register its own field work.
 - Evidence for a tiempo detenido is a file count, like the other modules (no uploads yet).
@@ -895,7 +934,7 @@ these are desk tasks and the managers' bottom nav is full.
 
 **Simplifications**:
 - Plans are registered by Gerencia on this page (tap the plan chip in «Resultados»). The prototype
-  expects them to come from «Integraciones» (G-019), which doesn't exist yet. The portals are the
+  expects them to come from «Integraciones» (G-019), which has no live connectors yet. The portals are the
   traditional `fuente` values: Finca Raíz and Metrocuadrado exist but start inactive. A brand-new
   portal needs a new `fuente_lead` value (migration).
 - The download is a CSV that Excel opens. There's no PDF option.
@@ -935,7 +974,7 @@ values before and after. The page shows the last 15.
 | Marca | Logo (PNG or SVG, < 150 KB, stored as a data URL), name, tagline, three greens | **Wired**: sidebar, mobile bar, login and `BrandLogo`. Greens become CSS variables on `<html>` during server rendering (hover and sidebar shades are derived). Traffic-light colours never change. `GET /configuracion/marca` is public so the login page can show it. |
 | Pendientes para salir a producción | 10 items. 3 resolve themselves when set where they live (GPS deadline in Movimientos, the update rule in Plataformas, retención in Tarifas); 7 Gerencia ticks as defined. «Activar uso real» only works with none left. | The flag is stored; nothing else changes with it yet |
 | Fechas de pago al personal | Salary cuts and the commission pay day | **Wired**: reads and writes Compensación's config (`dia_corte_1`, `dia_corte_2`, `dia_pago`), already used by «Salarios del mes», «Comisiones» and «Mis pagos» |
-| Tarifas de intermediación | Arriendo %, papelería, IVA, venta %, referidos %, retención (empty = pending) | Stored only: «Negocios» doesn't exist yet |
+| Tarifas de intermediación | Arriendo %, papelería, IVA, venta %, referidos %, retención (empty = pending) | **Wired**: ganancia of each deal in «Negocios» |
 | Automatizaciones y avisos | Minutes before a lead without responsable alerts; daily summary time; escalation | **Wired**: the minutes drive the «sin responsable» alert on the Coordinación dashboard (was hardcoded at 15). The other two are stored for the future notifications module. |
 | Idioma | Español / English / Italiano | Only Spanish can be applied; the others show «traducción pendiente» |
 | Leads ganados y perdidos | Points per lead ganado / perdido; minimum calls on consecutive days | **Wired**: rendimiento of Atención y Preventa (was `PUNTOS_LEAD_*`) and `leads.perdida_descuenta` (was 3 calls in 3 days). Values are chosen from lists, and a lost lead must cost less than a won one adds. |
@@ -948,8 +987,8 @@ indicators and weights, compensation, salaries, GPS, platforms).
   points. The others say «Pendiente: módulo de avisos» instead of Z02's example statuses.
 - Lead points apply to the whole current month when changed. Z02 says «desde el día siguiente»,
   which would need the rules' history per day. The call rule applies to leads marked lost from then on.
-- Cards for screens that don't exist yet are left out: Integraciones, cargos laborales, costos del
-  personal, negocios, pólizas, valor y productividad, carga de leads desde Excel and Mi perfil.
+- Cards for screens that don't exist are left out: cargos laborales, costos del personal, valor y
+  productividad and carga de leads desde Excel.
 - «Si el día cae en fin de semana o festivo, se paga el día hábil anterior» is still pending, as in
   the prototype.
 - Z02's list of 26 pendientes (G-053) is reduced to the 10 it shows.
@@ -1016,7 +1055,7 @@ top bar. Everyone has the page; each person only sees their own avisos and agend
   the time of an agenda item, the 7:30 summary and escalation (Configuración) wait for that job.
 - Accept / reject a cita, «Seguir lead» and similar act on their own pages: the aviso's button
   takes you there, instead of confirming inside the notification as on M10.
-- G09's «Integración» aviso isn't generated: Integraciones doesn't exist yet.
+- G09's «Integración» aviso isn't generated: Integraciones has no live connectors, so nothing fails.
 
 Endpoints (`/api/v1/avisos`):
 - `GET /conteo` (the bell: `por_atender`, `resumen_sin_leer`, `agenda_hoy`) · `GET ?vista=por_atender|atendidos|resumen`
@@ -1075,8 +1114,8 @@ sidebar, with a grey badge of today's pending activities. Gerencia has it in «A
 
 **Simplifications**:
 - Accepted route zones appear (M17's «Ruta del coordinador», see Rutas). Firmas, pólizas and other
-  system items X06 shows aren't there: firmas don't exist yet, and pólizas, salaries and
-  commissions already come as avisos.
+  system items X06 shows aren't there: firmas (Negocios), pólizas, salaries and commissions come
+  as avisos instead. Programmed capacitaciones do appear.
 - No reminder at the time of each activity and no Google Calendar / Outlook sync: they need the
   background job and Integraciones.
 - An activity can't be edited: delete it and add it again (only what you put). Dates in the past
@@ -1293,8 +1332,8 @@ policies; the nine closed rental deals in every state (one expired and one about
 one, a second study, two active…) and 12 older active contracts. DATOS DE EJEMPLO.
 
 **Simplifications**:
-- «Negocios» doesn't exist yet, so studies are registered and decided in the new **«En trámite»**
-  tab instead of the deal's page. When Negocios exists, these actions can move there.
+- Studies are registered and decided in the **«En trámite»** tab here, not on the deal's page:
+  «Negocios» shows each rental's policy state and links to this page (G-087 keeps them separate).
 - The 2 points per recovered policy (G-084) aren't added: the Auxiliar has no result in
   rendimiento yet. Recovered policies are recorded and counted in Indicadores.
 - **Reclamaciones** aren't recorded, so the comparator shows «No se registran todavía».
@@ -1371,8 +1410,8 @@ for next week (from the template) and last week's, rated 5. Bruno has the whole 
   (Integraciones: Google Maps «Sin conectar»).
 - Arrivals are marked by hand; they aren't checked against the GPS position, and GPS alerts
   («salida de ruta») still come from Movimientos y GPS, not from the zones.
-- Sedes, schedules, check-in radius and «Cambiar ubicación» belong to the attendance module, which
-  doesn't exist yet: the location table is read-only and comes from the accepted routes.
+- Sedes, schedules and check-in radius are in Asistencia («Sedes y horario»). The location table
+  here stays read-only and comes from the accepted routes.
 - The real zone list and rejection reasons are PENDIENTE DE CONFIGURACIÓN (example values).
 - Coordinación can also cancel an accepted route that hasn't ended (G-083 only mentions pending
   ones), so plans can change mid-period.
@@ -1460,12 +1499,305 @@ Endpoints (`/api/v1/asistencia`):
   `GET /export.csv`
 - `GET /config` · `PUT /config` · `POST /sedes` · `PATCH /sedes/{id}` · `PUT /ubicacion/{user_id}`
 
+## Negocios (`/negocios`, X02 · M16)
+
+X02 «Negocios» and M16 «Detalle del negocio» (decisions G-029, G-031, G-033, G-034, G-055, G-059,
+G-060, G-087, G-091). Rules are in `backend/app/services/negocios.py`.
+
+**The record.** A negocio is the `Cierre` (`NEG-0140…`) that Compensación already creates for each lead
+marked «Ganado». The module adds the deal's data to that same row (property, canon or price, last offer,
+where the documents are, contract attached, notary appointment) and its signature flow. Money received
+on sales goes in `negocio_abonos`. Every change is a `compensacion_eventos` row (entidad `cierre`), shown
+in the deal's history and in «Registro de cambios» (module «Negocios», now linking to `/negocios`).
+
+**Who.**
+- **Auxiliar administrativa**: manages everything (sidebar: NEGOCIOS › Negocios).
+- **Gerencia**: sees everything and can edit the deal's data (value, % of the sale, documents), but
+  doesn't confirm signatures: that's the Auxiliar's job (G-029), as in the prototype (sidebar: COMERCIAL).
+- **Coordinación**: sees all deals read-only, without money (no ganancia, no amounts received), as with
+  the rest of the pay data (sidebar: COMERCIAL).
+- **Asesores**: «Mis negocios», only the deals they close (M16).
+- Everyone else gets 403.
+
+**Flow.**
+1. **Stages** (example ones, PENDIENTE DE CONFIGURACIÓN). Arriendo: Estudio del arrendatario → Contrato en
+   firma → Contrato firmado. Venta: Oferta presentada → Promesa firmada → Escrituración → Escriturada.
+   The asesor (or the Auxiliar) «Pasar etapa» with an observation and, optionally, the offer or negotiated
+   condition (G-059); staying on the same stage records a new offer. Moving a sale to Escrituración needs
+   the notary appointment (date, time, notaría), which sends a reminder 2 days before (G-031).
+2. **«Solicitar cierre»** (asesor): «¿El cliente ya firmó?». The Auxiliar gets an aviso and the deal shows
+   in «Firmas por confirmar».
+3. The Auxiliar **confirms the signature** (date, contract optional, observation) or **returns it** with a
+   reason (the asesor gets an aviso). Rentals have one signature; sales two (G-033): the promesa first,
+   then the escritura. The last one gives **«negocio cerrado»**: the final stage, the ganancia efectiva is
+   sent to Compensación (which generates the commissions, G-029), the asesor gets an aviso, and for a
+   rental with an approved policy the contract signature is recorded in «Pólizas» (the insurer's
+   deadline to activate starts). The Auxiliar can also confirm a deal that has no asesor.
+4. **Negocio caído** (G-055): the asesor reports it with a reason (the Auxiliar gets an aviso) and the
+   Auxiliar confirms it, or keeps the deal going («Seguir con el negocio»); the Auxiliar can also confirm
+   one directly. «Póliza negada» is a reason only for rentals (G-060). A confirmed caída cancels the
+   deal's unpaid commissions, no longer counts in Rendimiento, and the asesor and Gerencia get an aviso.
+   The lead stays «Ganado», and Compensación's sync no longer reopens such a deal.
+5. **Money received** on sales (G-033): value, date, moment (promesa, escritura, other), supporting file.
+
+**Ganancia** (G-087), from «Tarifas de intermediación» in Configuración:
+- Arriendo: charged once = canon × 20 % + IVA + papelería $75.000 (IVA included). Minus the IVA
+  collected, the team's commissions, one month of the policy (canon × the policy's price; months
+  PENDIENTE) and the referral (10 % of the canon).
+- Venta: price × % (per deal, default from Configuración) + IVA, minus the IVA and the commissions.
+- The *ganancia efectiva* sent to Compensación is the charge without IVA, minus referrals.
+- Until a deal is closed, commissions are estimated with Compensación's percentages («proyectada»).
+  A deal that loses money shows the red alert.
+- IVA of the canon (commercial use) and retención (tenant is a company) are shown apart: they aren't
+  the company's money.
+
+**Page.** Tabs Firmas por confirmar · En proceso · Cerrados · Caídos. «Indicadores de negocios» (G-091):
+Desde/Hasta and Tipo; Total, En negociación, Por cerrar, Cerrados, Caídos (+ reported) and Ganancia
+(closed + projected); a tap on a figure filters the list. Bars by type and «Ganancia de cada negocio».
+Each deal card has stage, closing request, signatures, policy (rentals) or money received (sales),
+documents, the ganancia breakdown, policy activation (closed rentals, linking to «Pólizas»), the actions
+and the history. Asesores get the M16 layout: data, stage stepper, «Pasar etapa», «Negocio caído»,
+notary appointment, history and «Solicitar cierre».
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /negocios?desde=&hasta=&tipo=` | Board (asesor: their deals). Default: from the 1st of the month 3 months back to today |
+| `GET /negocios/{id}` · `PATCH /negocios/{id}` | Detail with history · deal data (Auxiliar, Gerencia) |
+| `POST /negocios/{id}/etapa` | `{etapa?, oferta?, observacion, notaria?, notaria_at?}` (asesor of the deal, Auxiliar) |
+| `POST /negocios/{id}/solicitar` | `{nota?}` (asesor of the deal) |
+| `POST /negocios/{id}/confirmar` · `/devolver` | `{fecha, contrato_adjunto, observacion?}` · `{motivo}` (Auxiliar) |
+| `POST /negocios/{id}/caida` · `/caida/descartar` | `{motivo, observacion}`: the asesor reports, the Auxiliar confirms |
+| `POST /negocios/{id}/abonos` | `{valor, fecha, momento, soporte}` (Auxiliar, sales) |
+
+**Migration.** Deals from before this module that already had a ganancia count as signed on the day the
+lead was won; the rest start «en proceso» on the first stage.
+
+**Demo data.** `seed_negocios` gives every deal a value (before Compensación registers the ganancia, so
+commissions follow the tariffs), links rentals to their policy's property, closes the deals that have a
+ganancia and the platform leads won without an asesor, and adds deals in every state: a contract and a
+promesa to confirm, a request returned to the asesor, a sale in escrituración with money received and
+the notary in two days, a caída reported by the asesor and one confirmed. Log in as `auxiliar@`,
+`gerencia@`, `coordinacion@`, `diego@`, `carla@` or `asesor@`. On a database seeded before this module,
+deal values are worked out backwards from the ganancia already registered; for the realistic values,
+reset the database and seed again.
+
+**Simplifications** (to revisit):
+- Deals still start when a lead is marked «Ganado» (by managers). G-055's «Ganado set by the system when
+  the Auxiliar confirms» would mean creating deals before the lead is won; not done.
+- Rendimiento still counts a deal when the lead is won, not at the promesa (sales) or the signature.
+- No partial commissions per payment received on a sale (percentages PENDIENTE): commissions are
+  generated at «negocio cerrado».
+- «Subir contrato» and supporting files are marked as present; no file storage yet.
+- «Seguimiento del cliente» and «Documentación OK / Observaciones de documentos» from M16 aren't built;
+  follow-ups stay in the lead and the agenda.
+- No «negocios pendientes» on the asesor's home, and no «negocios con pérdida» on the Auxiliar's home yet.
+- The deal's «Activar póliza» stays in «Pólizas» (G-087 separated them); the card links there.
+
+## Descargas del personal (`/descargas`, X10)
+
+X10 «Descargas del personal». Rules are in `backend/app/services/descargas.py`.
+
+**Who.** The Auxiliar administrativa (X10 is in her PERSONAL menu) and Gerencia download everyone.
+Coordinación downloads its team, with the same rule as each module (preoperacionales of asesores,
+Atención y Preventa and the Auxiliar; asistencia and pausas activas of asesores and Atención;
+ausencias of everyone but Gerencia), never its own, and not capacitaciones (G-047). Everyone else gets 403. Sidebar: PERSONAL (Auxiliar), EQUIPO (Gerencia,
+Coordinación).
+
+**Page** (as X10): tabs per file; «Todo el personal (grupal)», «Por cargo» or «Por empleado»;
+Desde / Hasta (at most a year; this month by default); Formato; «El archivo trae: …»; «Se descargará: …»
+with the real number of rows; «Descargar»; «Descargas recientes» (the person's last 6).
+
+**Files** (CSV with `;` and a BOM, which Excel opens with accents, like the other exports). Named
+`CDC_<Tipo>_<Quién>_<desde>_a_<hasta>.csv` (accents dropped from the name).
+
+| Tab | One row per | Columns |
+|-----|-------------|---------|
+| Preoperacionales | person and business day that counts | estado (Realizado / No realizado), hora, medio, placa, respuestas SÍ/NO, the NO questions, novedad, observaciones, revisada por and when, the month's score and % (same rules as «Mi preoperacional») |
+| Asistencia | person and day with a marcación | as K17's «Descargar Excel»: ubicación asignada, dónde marcó, entrada y estado, minutos tarde, leve o grave, salida y estado, minutos que se descuentan, horas extra aceptadas, observación |
+| Ausencias y permisos | absence that touches the period | NOV-number, tipo, desde, hasta, days within the period, observación, soportes, registered by and when, estado, cancelled by and reason |
+| Pausas activas | person, working day and pause that already closed | persona, cargo, fecha, pausa (mañana / tarde), hora programada, estado (Realizada / No realizada / Ausencia), hora en que marcó «Realizada», the person's compliance in the period (%) |
+| Capacitaciones | person and training in the period | CAP-number, fecha, hora, tema, área, presentó, lugar, origen (programada por… / registrada por…), estado, respuesta, participó, motivo, qué aprendió, observaciones |
+
+Cargo groups are X10's: Asesores, Atención y Preventa (the Atención cargo and Pre-ventas), Coordinación,
+Administrativa, Gerencia.
+
+Every download is logged in `configuracion_eventos` (section `descargas`) and shows in «Registro de
+cambios» as module **Descargas** (Gerencia and Coordinación).
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /descargas` | Tabs (with the groups you can download), people, groups, your recent downloads |
+| `GET /descargas/{pre\|asi\|aus\|pau\|cap}/vista-previa?desde=&hasta=&alcance=tod\|car\|emp&grupo=&user_id=` | Rows, text and file name |
+| `GET /descargas/{pre\|asi\|aus\|pau\|cap}.csv?…` | The file (same filters) |
+
+**Simplifications**:
+- «PDF (con resumen)» is listed as pending; only Excel (CSV).
+- The other modules keep their own downloads (preoperacional by month, asistencia, rendimiento,
+  comisiones, movimientos, plataformas, registro de cambios); this page doesn't repeat them.
+
+## Capacitaciones (`/capacitaciones`, Z03 · X07)
+
+Z03 «Mis capacitaciones» and X07 «Capacitaciones del equipo» (decisions G-046 and G-047). Rules are in
+`backend/app/services/capacitaciones.py`.
+
+**Data.** `capacitaciones` (CAP-001…: origen *programada* or *registrada*, tema, área, quién presenta,
+lugar o enlace, date and time, estado *programada* → *realizada* or *cancelada*, who it's for),
+`capacitacion_participantes` (one row per person: respuesta *pendiente / acepta / no* with the reason,
+whether they attended, what they learned, observations) and `capacitacion_eventos` (every change, shown
+in «Registro de cambios» as module **Capacitaciones**).
+
+**Who.**
+- **Everyone** has «Mis capacitaciones» (sidebar, above «Mi perfil»).
+- **The Auxiliar, Coordinación and Gerencia** also have «Capacitaciones del equipo» (`?tab=equipo`;
+  sidebar: PERSONAL for the Auxiliar, EQUIPO for Coordinación and Gerencia).
+- **Only the Auxiliar and Gerencia** download the Excel (G-047).
+
+**Flow.**
+1. **Programar** (X07): date, time, área, tema, who presents, place or link, and who takes part: the
+   whole team, Comercial (asesores), Atención y Preventa, Administrativa (the Auxiliar) or specific
+   people. Everyone active except Gerencia can take part. Each participant gets an aviso, and the
+   training appears in their agenda (new «Capacitación» colour). Their history shows «Programada por
+   Gerencia / Coordinación / la Auxiliar administrativa».
+2. **Responder** (Z03): «Aceptar participación», or «No podré participar» with a reason (cita con
+   cliente, incapacidad o permiso, vacaciones, otro motivo, which asks for the detail). The answer can
+   change until the training is closed. Declined trainings leave the person's agenda.
+3. **Marcar asistencia**: once the start time has passed, an organizer marks who attended (those who
+   accepted come checked). The training becomes «realizada». The person who programmed it gets an aviso
+   until it's done. A programmed training can be cancelled with a reason.
+4. **Registrar participación** (Z03): anyone records a training they took on their own (date, time,
+   área, tema, who presented, what they learned, observations). The Auxiliar and Gerencia get an aviso
+   in the daily summary.
+5. **Qué aprendí**: after attending a programmed training, the person can add what they learned from
+   their history.
+
+**Team view (X07).** Desde/Hasta (this month by default). KPIs: programadas, por responder, registradas
+por el equipo, no participaron (and how many with a reason). Each programmed training shows how many
+accepted (or attended), haven't answered or won't take part, with each person's answer and reason. There's
+also the list of trainings the team registered, and «Descargar Excel» (the Descargas file for the
+period).
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /capacitaciones/mias` | Z03: to answer, history, áreas, motivos |
+| `GET /capacitaciones/equipo?desde=&hasta=` | X07 (Auxiliar, Coordinación, Gerencia) |
+| `POST /capacitaciones` | Programar `{fecha, hora, area, tema, presenta, lugar?, participantes: todo\|com\|ate\|adm\|per, personas?}` |
+| `POST /capacitaciones/registrar` | `{fecha, hora, area, tema, presenta, aprendio, observaciones?}` |
+| `POST /capacitaciones/{id}/responder` | `{acepta, motivo?, detalle?}` (participants) |
+| `POST /capacitaciones/{id}/completar` | `{asistentes: [user_id]}` (organizers, after it started) |
+| `POST /capacitaciones/{id}/cancelar` · `/aprendizaje` | `{motivo}` · `{aprendio, observaciones?}` |
+
+**Demo data** (`seed_capacitaciones`, relative to today): the prototype's trainings.
+- Three upcoming ones, programmed by Gerencia, Coordinación and the Auxiliar, with a mix of answers.
+- One already held, with its attendance marked and one absence with a reason.
+- One held yesterday, still waiting for its attendance.
+- Four the team registered themselves.
+
+**Simplifications**:
+- Organizers program and see the whole team (everyone but Gerencia). Coordinación isn't limited to its
+  own team, as X07-coord shows the same list.
+- The notification is an aviso in the bell and the agenda item; there's no e-mail or reminder before
+  the training.
+- No attachments (certificates), evaluation or attendance list signature; no editing a programmed
+  training (cancel and program it again).
+- «Permisos (24 módulos)» and «Historial y reportes» from G-046 don't exist in the app.
+- The prototype's Excel and PDF become the CSV of «Descargas del personal».
+
+## Pausas activas (`/pausas-activas`, G11)
+
+G11 «Pausas activas» and the reminder in each Inicio (decisions G-041, G-045, G-060, G-065). Rules are
+in `backend/app/services/pausas.py`.
+
+**The rule.** Two pauses a day (mañana and tarde) for every cargo, Gerencia included, on working days
+(Monday to Friday) from the day the person started. Example schedule: 10:00 a. m. and 3:00 p. m., with
+the reminder on screen for 15 minutes (PENDIENTE DE CONFIGURACIÓN). It doesn't count in the indicators
+(G-045): it's a compliance record.
+
+**The reminder.** During the window, each person's Inicio shows «Es hora de tu pausa activa de la
+mañana / tarde», the message and «Realizada». The Inicio pages are the general home, the asesor's home,
+and Coordinación's and Gerencia's dashboard. Tapping it records the person, date, pause, scheduled time
+and the time they marked it, and the reminder goes away. Outside the window there's nothing to mark.
+Once the window has passed without it, that pause is «No realizada». A day with a registered absence
+(«Ausencias y permisos») shows «Ausencia» and doesn't count.
+
+**Who.**
+- **Everyone:** «Mis pausas activas» (sidebar, MI DÍA): compliance, done and missed in a Desde/Hasta
+  range, and the day-by-day list. The reminder can also be marked there.
+- **Auxiliar administrativa:** sets the schedule (both times on the 15-minute clock, mañana before
+  12:00 and tarde after, 5–60 minutes on screen).
+- **Auxiliar and Gerencia:** edit the message (it can't be empty).
+- **Gerencia:** consults and downloads, but doesn't change the schedule (G-045).
+- **Coordinación:** sees its team (asesores and Atención y Preventa), read-only.
+- **Team view** (`?tab=equipo`; sidebar: PERSONAL › «Pausas activas (horario)» for the Auxiliar, EQUIPO for
+  Coordinación and Gerencia), as G11:
+  - The schedule card.
+  - KPIs: mañana and tarde today (done / total and who's missing), compliance in the period, missed in
+    the period.
+  - Today's record.
+  - With a person chosen, their pauses day by day.
+  - «Descargar Excel» (the Descargas file).
+
+Schedule and message changes go to «Registro de cambios» (module **Pausas activas**). They're stored in
+`configuracion_eventos`, section `pausas_activas`.
+
+**Data.** `pausas_config` (one row: both times, minutes on screen, message) and `pausas_activas` (one row
+per pause marked «Realizada», with the time scheduled that day). Missed pauses aren't stored: they're
+worked out from the schedule.
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /pausas-activas/ahora` | The reminder on screen now (if any) and today's two pauses |
+| `POST /pausas-activas/realizada` | Mark the pause on screen (409 outside the window or if already marked) |
+| `GET /pausas-activas/mias?desde=&hasta=` | Own compliance and days (this month by default) |
+| `GET /pausas-activas/equipo?desde=&hasta=&user_id=` | Team view (Auxiliar, Coordinación, Gerencia) |
+| `PUT /pausas-activas/horario` · `PUT /pausas-activas/mensaje` | `{hora_manana, hora_tarde, minutos}` (Auxiliar) · `{mensaje}` (Auxiliar, Gerencia) |
+
+**Demo data** (`seed_pausas`): the example schedule and six weeks of pauses for every active person,
+most marked a few minutes after the time and a few missed, up to the pauses that have already closed
+today.
+
+**Simplifications:**
+- Working days are Monday to Friday for everyone; Asistencia's schedule per sede isn't used.
+- Missed pauses use today's schedule, so changing the times also changes the times shown for past
+  missed pauses (marked ones keep theirs).
+- The reminder refreshes every minute while the Inicio is open; there's no push notification. It isn't
+  in the mobile bottom bar, which is already full. On the phone the Inicio reminder is the way in, as in
+  the prototype.
+- The prototype's «mostrar el aviso ahora» demo button isn't there.
+
 ## Business rules
 
 - **Cargo** defines a person's general profile: Gerencia, Coordinación, Asesor, Auxiliar administrativa, Atención al Cliente.
 - **Commercial activities** (Captación, Ventas, Arriendos) are switched on per person and stored in `user_actividades`, which records who granted each one. Coordinación will change them through `services.users.set_actividades`.
 - **Atención al Cliente** and **Pre-ventas** are independent functions (`users.funcion`) and can't be combined with commercial activities. This is checked in the service and backed by a database trigger. The Atención al Cliente cargo always has the Atención al Cliente function (a check constraint enforces it).
 - **GPS / check-in** applies only when Captación is active (`gps_checkin_enabled` on the user). The Coordinador and Atención y Preventa only have GPS while in the field (see Movimientos y GPS).
+
+## Known simplifications and what production still needs
+
+Each module lists its own simplifications. Across the app:
+
+- **Prototype values.** Percentages, goals, schedules, insurers, tariffs and stages marked
+  PENDIENTE DE CONFIGURACIÓN use example values that Gerencia (or the Auxiliar) can edit; the real
+  ones still have to be entered.
+- **Files.** Nothing is uploaded: supporting documents, contracts, certificates and photos are
+  marked «adjunto» or kept as text (profile photos are small data URLs). Production needs object
+  storage (e.g. S3) and an upload endpoint.
+- **Background jobs.** Nothing runs on its own. Avisos are synced when someone opens the bell,
+  reminders show while a page is open, and month-end bonuses are calculated with a button. A
+  scheduler (cron, Celery/RQ or a cloud scheduler) is needed for the daily summary at 7:30, escalations,
+  notary and agenda reminders, expiring policies and automatic month-end jobs.
+- **Notifications.** In-app only (bell, banners). No e-mail, SMS, WhatsApp or push.
+- **Integrations.** The Integraciones page stores connection data and costs, but no portal, social
+  network, calendar or accounting connector exists. Leads are created by hand or by the seed.
+- **GPS and location.** The browser location is recorded when someone marks, but there's no
+  geocoding (distance to an address) and no background tracking.
+- **Exports.** CSV that Excel opens; no .xlsx or PDF (summaries, certificates).
+- **Auth.** Access and refresh tokens are in cookies the page can read; the refresh token should
+  become `httpOnly`. People change their password in «Mi perfil», but there's no recovery by e-mail
+  (it needs e-mail sending) and no 2FA.
+- **Ops.** No production deployment, HTTPS, backups, monitoring or rate limiting yet. The API refuses
+  to start outside `local`/`test` without a real `JWT_SECRET`, and the seed refuses to run there.
+- **Financial software.** The «Software Financiero» described in the prototype's `PROJECT_STATE.md`
+  is a separate phase and isn't started.
 
 ## Deployment (later)
 

@@ -140,6 +140,9 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
           items: [
             { t: 'Usuarios, cargos y actividades', d: 'Crear, editar o desactivar usuarios; Captación, Ventas y Arriendos por persona.', to: '/usuarios' },
             { t: 'Ausencias y permisos', d: 'Incapacidades y permisos; descuentan en «Salarios del mes».', to: '/novedades' },
+            { t: 'Asistencia, sedes y horario', d: 'Sedes, jornada, radio para marcar y tolerancia de impuntualidad.', to: '/asistencia?tab=sedes' },
+            { t: 'Pausas activas', d: 'Horario (lo fija la Auxiliar), mensaje del aviso y registro de cumplimiento.', to: '/pausas-activas?tab=equipo', pend: 'Horario real: pendiente' },
+            { t: 'Capacitaciones del equipo', d: 'Programar capacitaciones, respuestas por persona y registro.', to: '/capacitaciones?tab=equipo' },
           ],
         },
         {
@@ -167,6 +170,7 @@ const GRUPOS = computed<{ t: string; items: Card[] }[]>(() =>
           items: [
             { t: 'Usuarios y actividades', d: 'Agregar, editar o desactivar personas; activar o quitar Captación, Ventas y Arriendos. El GPS sigue a Captación.', to: '/usuarios' },
             { t: 'Ausencias y permisos', d: 'Registrar incapacidades y permisos; revisar novedades del preoperacional.', to: '/novedades' },
+            { t: 'Capacitaciones del equipo', d: 'Programar capacitaciones y ver quién participa y quién no, con el motivo.', to: '/capacitaciones?tab=equipo' },
           ],
         },
         {

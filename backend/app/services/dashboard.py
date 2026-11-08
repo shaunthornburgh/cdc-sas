@@ -1,9 +1,9 @@
 """Coordinación / Gerencia dashboard (prototype K01-DashCoord, phone K11-CoordCel).
 
-Everything is aggregated from existing data (users, leads, citas, captaciones) with grouped
-queries, so the cost doesn't grow with the number of people. Sections of the prototype that
-depend on modules not built yet (tareas, pedidos, GPS alerts, preoperacional, asistencia,
-rendimiento) are left out rather than faked.
+Everything is aggregated from existing data (users, leads, citas, captaciones, pedidos,
+preoperacional) with grouped queries, so the cost doesn't grow with the number of people. The
+prototype's tareas, GPS alerts, attendance and rendimiento tiles aren't here: they live on their
+own pages (Agenda, Movimientos y GPS, Asistencia, Mi equipo).
 """
 
 import uuid

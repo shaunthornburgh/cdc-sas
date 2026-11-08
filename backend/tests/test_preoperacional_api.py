@@ -5,6 +5,7 @@ import pytest
 from app.models import Preoperacional
 from app.models.enums import ActividadComercial as A
 from app.models.enums import Cargo, MedioTransporte
+from app.services import fechas
 from app.services import preoperacional as svc
 from tests.conftest import auth_header, login
 
@@ -144,11 +145,18 @@ def test_only_gerencia_changes_config(client, p, H):
 # ---------------------------------------------------------------- history & score
 
 
+@pytest.fixture
+def miercoles(monkeypatch):
+    """A fixed Wednesday, so the tests that depend on «today» being a business day always run
+    (on a weekend «today» would be «fin_de_semana» and nobody «sin realizar»)."""
+    monkeypatch.setattr(fechas, "now", lambda: datetime(2026, 10, 14, 10, 0, tzinfo=fechas.BOGOTA))
+
+
 def test_score_rule():
     assert [svc.puntaje(x) for x in (100, 95, 90, 85, 75, 69)] == [5, 4, 4, 3, 2, 1]
 
 
-def test_my_history_counts_business_days(client, db, p, H):
+def test_my_history_counts_business_days(client, db, p, H, miercoles):
     juan = p["juan"]
     today = svc.hoy()
     first = today.replace(day=1)
@@ -214,9 +222,7 @@ def test_team_visibility(client, p, H):
         assert client.get(f"{PRE}/equipo", headers=H(p[key])).status_code == 403
 
 
-def test_team_kpis_and_review(client, p, H):
-    if svc.hoy().weekday() >= 5:
-        pytest.skip("Weekend: nobody is «sin realizar»")
+def test_team_kpis_and_review(client, p, H, miercoles):
     client.post(
         PRE, json={"medio": "carro", "placa": "ABC123", "respuestas": SI8}, headers=H(p["juan"])
     )
@@ -263,9 +269,7 @@ def test_export_csv(client, p, H):
     assert client.get(f"{PRE}/export.csv", headers=H(p["juan"])).status_code == 403
 
 
-def test_dashboard_and_asesor_home_show_it(client, p, H):
-    if svc.hoy().weekday() >= 5:
-        pytest.skip("Weekend")
+def test_dashboard_and_asesor_home_show_it(client, p, H, miercoles):
     d = client.get("/api/v1/dashboard/coordinacion", headers=H(p["coord"])).json()
     assert d["preoperacional"]["sin_realizar"] == d["preoperacional"]["total"]
     assert any("realizado el preoperacional" in a["titulo"] for a in d["alertas"])
