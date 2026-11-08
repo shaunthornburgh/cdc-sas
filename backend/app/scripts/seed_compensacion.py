@@ -1,7 +1,8 @@
 """Demo compensation (called from app.scripts.seed, after the rendimiento seed).
 
 Goes through the services like real use: salaries set by Gerencia, the ganancia of each closed deal
-registered by the Auxiliar (which generates the commissions), the visto bueno → approval → payment
+registered by the Auxiliar from the deal's value and Gerencia's tariffs (which generates the
+commissions), the visto bueno → approval → payment
 flow, last month's bonuses and group commission, and the salary periods. Payment dates are then
 moved to the day they would have been paid. Amounts are example values.
 """
@@ -14,8 +15,9 @@ from sqlalchemy.orm import Session
 from app.models import Bono, Cierre, Comision, Pago, SalarioConfig
 from app.models.enums import EstadoCompensacion as E
 from app.models.enums import EstadoPago, TipoNegocio
+from app.scripts import seed_negocios as seed_neg
 from app.services import compensacion as svc
-from app.services import fechas
+from app.services import fechas, negocios
 from app.services import rendimiento as rend
 from app.services.users import get_user_by_email
 
@@ -28,10 +30,6 @@ SALARIOS = {
     "preventas": 1_500_000,
     "coordinacion": 4_000_000,
     "auxiliar": 2_000_000,
-}
-GANANCIA = {
-    TipoNegocio.VENTA: (7_500_000, 6_300_000, 8_400_000),
-    TipoNegocio.ARRIENDO: (2_700_000, 1_900_000, 3_200_000),
 }
 
 
@@ -54,18 +52,20 @@ def seed_compensacion(db: Session) -> int:
 
     # ---- closed deals: the Auxiliar registers the ganancia (the newest two are left for the demo)
     deals = svc.cierres(db, aux)
+    # «Negocios»: each deal's canon or price, so the ganancia comes from Gerencia's tariffs
+    seed_neg.valores(db, deals)
     recientes = [c.id for c in sorted(deals, key=lambda c: c.cerrado_at, reverse=True)[:2]]
     for i, c in enumerate(sorted(deals, key=lambda c: c.cerrado_at)):
         if c.id in recientes:
             continue
-        opciones = GANANCIA[c.negocio or TipoNegocio.ARRIENDO]
+        ganancia = negocios.ganancia(c, negocios.Ctx(db, [c]))["efectiva"]
         captador = None
         if c.negocio == TipoNegocio.VENTA:
             captador = u["bruno"] if i % 2 == 0 else u["asesor"]
         svc.registrar_ganancia(
             db,
             c,
-            ganancia=opciones[i % len(opciones)],
+            ganancia=ganancia,
             captador_id=captador.id if captador else None,
             actor=aux,
         )

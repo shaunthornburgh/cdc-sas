@@ -223,7 +223,7 @@ def seed_polizas(db: Session) -> int:
     ]
     for k, (c, (ia, it, kw)) in enumerate(zip(cierres, plan, strict=False)):
         inm = inms[k] if k < len(inms) else None
-        canon = inm.precio if inm and inm.precio else 1_800_000
+        canon = c.valor or (inm.precio if inm and inm.precio else 1_800_000)
         pol(tipos[ia][it], canon, cierre_id=c.id, inmueble_id=inm.id if inm else None, **kw)
         n += 1
     db.flush()

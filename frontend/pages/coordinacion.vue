@@ -122,6 +122,7 @@ const equipoCel = computed(() => [
       </PageBar>
 
       <div class="cnt">
+        <PausaBanner />
         <div class="g6">
           <NuxtLink v-for="k in kpis" :key="k.t" class="card kpi" :class="k.tint" :to="k.to">
             <div class="lbl">{{ k.t }}</div>

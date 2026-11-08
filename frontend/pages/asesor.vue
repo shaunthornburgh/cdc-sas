@@ -58,6 +58,7 @@ const { data: puntaje } = useLazyAsyncData('asesor-puntaje', () => rendApi.mio()
 
 <template>
   <div class="cnt home">
+    <PausaBanner v-if="!viewing" />
     <div v-if="error" class="note bad"><b>No se pudo cargar tu inicio.</b> {{ apiErrorMessage(error) }}</div>
     <template v-else-if="data">
       <div v-if="viewing" class="note warn">

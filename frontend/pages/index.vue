@@ -22,6 +22,7 @@ const today = new Intl.DateTimeFormat('es-CO', {
   <PageBar :title="`Hola, ${firstName(user.full_name)}`" :subtitle="`${CARGO_LABELS[user.cargo]} · ${today}`" />
 
   <div class="cnt">
+    <PausaBanner />
     <PreopBanner v-if="preopForm" :activo="preopForm.activo" :realizado-at="preopForm.registro_de_hoy?.realizado_at ?? null" :novedad="preopForm.registro_de_hoy?.tiene_novedad" />
     <div class="g3">
       <div class="card stack">

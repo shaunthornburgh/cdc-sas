@@ -7,17 +7,21 @@ from app.api.routes import (
     asistencia,
     auth,
     avisos,
+    capacitaciones,
     captaciones,
     citas,
     compensacion,
     configuracion,
     dashboard,
+    descargas,
     health,
     inmuebles,
     integraciones,
     leads,
     movimientos,
+    negocios,
     novedades,
+    pausas,
     pedidos,
     perfil,
     plataformas,
@@ -56,3 +60,7 @@ api_router.include_router(integraciones.router)
 api_router.include_router(polizas.router)
 api_router.include_router(rutas.router)
 api_router.include_router(asistencia.router)
+api_router.include_router(negocios.router)
+api_router.include_router(descargas.router)
+api_router.include_router(capacitaciones.router)
+api_router.include_router(pausas.router)

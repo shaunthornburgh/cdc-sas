@@ -88,6 +88,9 @@ MODULOS = [
     "Pólizas",
     "Rutas",
     "Asistencia",
+    "Capacitaciones",
+    "Pausas activas",
+    "Descargas",
     "Configuración",
 ]
 SOLO_GERENCIA = frozenset(
@@ -727,7 +730,13 @@ def _compensacion(db: Session, r: Rango) -> list[Fila]:
                 registro=reg or ("Configuración de pagos" if e.entidad == "config" else None),
                 antes=_txt(e.antes),
                 despues=_txt(e.despues),
-                link="/salarios" if e.entidad in ("liquidacion", "salario") else "/compensacion",
+                link=(
+                    "/salarios"
+                    if e.entidad in ("liquidacion", "salario")
+                    else "/negocios"
+                    if e.entidad == "cierre"
+                    else "/compensacion"
+                ),
             )
         )
     return out
@@ -847,7 +856,93 @@ def _configuracion(db: Session, r: Rango) -> list[Fila]:
             link=None if e.seccion == "registro_cambios" else "/configuracion",
         )
         for e in db.scalars(
-            _rango(select(ConfigEvento), ConfigEvento.created_at, r, ConfigEvento.actor_id)
+            _rango(
+                select(ConfigEvento).where(
+                    ConfigEvento.seccion.not_in(("descargas", "pausas_activas"))
+                ),
+                ConfigEvento.created_at,
+                r,
+                ConfigEvento.actor_id,
+            )
+        ).unique()
+    ]
+
+
+@fuente("Capacitaciones")
+def _capacitaciones(db: Session, r: Rango) -> list[Fila]:
+    from app.models import CapacitacionEvento
+
+    q = select(CapacitacionEvento)
+    return [
+        Fila(
+            id=f"cap:{e.id}",
+            at=e.created_at,
+            actor_id=e.actor_id,
+            actor=_name(e.actor),
+            modulo="Capacitaciones",
+            accion=e.accion,
+            registro=f"{e.capacitacion.code} · {e.capacitacion.tema}",
+            despues=e.detalle,
+            link="/capacitaciones?tab=equipo",
+        )
+        for e in db.scalars(
+            _rango(q, CapacitacionEvento.created_at, r, CapacitacionEvento.actor_id)
+        ).unique()
+    ]
+
+
+@fuente("Pausas activas")
+def _pausas(db: Session, r: Rango) -> list[Fila]:
+    """G11: schedule and message changes (the pauses themselves are a daily record, not changes)."""
+    return [
+        Fila(
+            id=f"pau:{e.id}",
+            at=e.created_at,
+            actor_id=e.actor_id,
+            actor=_name(e.actor),
+            modulo="Pausas activas",
+            accion=f"Cambió {(e.detalle or 'la configuración').lower()}",
+            registro="Pausas activas",
+            antes=_txt(e.antes),
+            despues=_txt(e.despues),
+            link="/pausas-activas?tab=equipo",
+        )
+        for e in db.scalars(
+            _rango(
+                select(ConfigEvento).where(ConfigEvento.seccion == "pausas_activas"),
+                ConfigEvento.created_at,
+                r,
+                ConfigEvento.actor_id,
+            )
+        ).unique()
+    ]
+
+
+@fuente("Descargas")
+def _descargas(db: Session, r: Rango) -> list[Fila]:
+    """X10: who downloaded which file of the staff's data (logged by services.descargas)."""
+    return [
+        Fila(
+            id=f"dsc:{e.id}",
+            at=e.created_at,
+            actor_id=e.actor_id,
+            actor=_name(e.actor),
+            modulo="Descargas",
+            accion=f"Descargó {str(e.despues.get('descarga', 'un archivo')).lower()}",
+            registro=e.despues.get("archivo"),
+            antes=None,
+            despues=" · ".join(
+                str(x) for x in (e.despues.get("quien"), e.despues.get("periodo"), e.detalle) if x
+            ),
+            link="/descargas",
+        )
+        for e in db.scalars(
+            _rango(
+                select(ConfigEvento).where(ConfigEvento.seccion == "descargas"),
+                ConfigEvento.created_at,
+                r,
+                ConfigEvento.actor_id,
+            )
         ).unique()
     ]
 

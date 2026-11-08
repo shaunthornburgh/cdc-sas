@@ -16,13 +16,16 @@ from app.scripts.seed_administracion import seed_administracion
 from app.scripts.seed_agenda import seed_agenda
 from app.scripts.seed_asistencia import seed_asistencia
 from app.scripts.seed_avisos import seed_avisos
+from app.scripts.seed_capacitaciones import seed_capacitaciones
 from app.scripts.seed_captaciones import seed_captaciones
 from app.scripts.seed_compensacion import seed_compensacion
 from app.scripts.seed_inmuebles import seed_inmuebles
 from app.scripts.seed_integraciones import seed_integraciones
 from app.scripts.seed_leads import seed_leads
 from app.scripts.seed_movimientos import seed_movimientos
+from app.scripts.seed_negocios import seed_negocios
 from app.scripts.seed_novedades import seed_novedades
+from app.scripts.seed_pausas import seed_pausas
 from app.scripts.seed_pedidos import seed_pedidos
 from app.scripts.seed_perfil import seed_perfil
 from app.scripts.seed_plataformas import seed_plataformas
@@ -121,6 +124,12 @@ def main() -> None:
         print(f"  asist.   {n} attendance records" if n else "  asist.   already present, skipped")
         n = seed_polizas(db)
         print(f"  pólizas  {n} policies" if n else "  pólizas  already present, skipped")
+        n = seed_negocios(db)
+        print(f"  negocios {n} deals in X02" if n else "  negocios already present, skipped")
+        n = seed_capacitaciones(db)
+        print(f"  capacit. {n} trainings" if n else "  capacit. already present, skipped")
+        n = seed_pausas(db)
+        print(f"  pausas   {n} pausas activas" if n else "  pausas   already present, skipped")
         n = seed_integraciones(db)
         print(f"  integr.  {n} integrations" if n else "  integr.  already present, skipped")
         n = seed_movimientos(db)

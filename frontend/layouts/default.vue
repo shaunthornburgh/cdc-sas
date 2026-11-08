@@ -11,6 +11,8 @@ const hasPedidos = computed(() => canUsePedidos(user.value))
 const hasInmuebles = computed(() => canUseInmuebles(user.value))
 const asesor = computed(() => !manager.value && hasCommercialActivity(user.value))
 const conResultado = computed(() => !!perfilRendimiento(user.value))
+const pauEquipo = computed(() => route.path === '/pausas-activas' && route.query.tab === 'equipo')
+const capEquipo = computed(() => route.path === '/capacitaciones' && route.query.tab === 'equipo')
 const asisEquipo = computed(() => route.path === '/asistencia' && ['equipo', 'sedes'].includes(String(route.query.tab ?? '')))
 const captador = computed(() => !manager.value && canCapture(user.value))
 const gerencia = computed(() => user.value?.cargo === 'gerencia')
@@ -74,6 +76,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       <NuxtLink v-if="asesor" class="nav" :class="{ on: isOn('/mis-citas') }" to="/mis-citas">Mis citas</NuxtLink>
       <NuxtLink v-if="captador" class="nav" :class="{ on: isOn('/rutas') }" to="/rutas">Mi ruta</NuxtLink>
       <NuxtLink class="nav" :class="{ on: route.path === '/preoperacional' }" to="/preoperacional">Mi preoperacional</NuxtLink>
+      <NuxtLink class="nav" :class="{ on: route.path === '/pausas-activas' && !pauEquipo }" to="/pausas-activas">Mis pausas activas</NuxtLink>
       <NuxtLink v-if="!gerencia" class="nav" :class="{ on: route.path === '/asistencia' && !asisEquipo }" to="/asistencia">Marcar entrada y salida</NuxtLink>
       <NuxtLink v-if="gps && !manager" class="nav" :class="{ on: isOn('/movimientos') }" to="/movimientos">{{ gps === 'atencion' ? 'Trabajo en campo y GPS' : 'Mis alertas de GPS' }}</NuxtLink>
       <template v-if="hasLeads">
@@ -87,10 +90,13 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: route.path === '/inmuebles' }" to="/inmuebles">Inmuebles</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/inmuebles/administracion') }" to="/inmuebles/administracion">Administración de inmuebles</NuxtLink>
         <NuxtLink v-if="manager" class="nav" :class="{ on: isOn('/plataformas') }" to="/plataformas">{{ gerencia ? 'Plataformas tradicionales' : 'Actualización de plataformas' }}</NuxtLink>
+        <NuxtLink v-if="manager" class="nav" :class="{ on: isOn('/negocios') }" to="/negocios">Negocios</NuxtLink>
+        <NuxtLink v-if="asesor" class="nav" :class="{ on: isOn('/negocios') }" to="/negocios">Mis negocios</NuxtLink>
         <NuxtLink v-if="gerencia" class="nav" :class="{ on: isOn('/polizas') }" to="/polizas">Pólizas</NuxtLink>
       </template>
       <template v-if="auxiliar">
         <div class="sect">NEGOCIOS</div>
+        <NuxtLink class="nav" :class="{ on: isOn('/negocios') }" to="/negocios">Negocios</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/polizas') }" to="/polizas">Pólizas</NuxtLink>
       </template>
       <template v-if="!hasPedidos && hasInmuebles">
@@ -114,6 +120,9 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: isOn('/rutas') }" to="/rutas">{{ gerencia ? 'Rutas del equipo' : 'Rutas y ubicación del equipo' }}</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/equipo') || (isOn('/resultados/') && route.path !== '/resultados') }" to="/equipo">{{ gerencia ? 'Rendimiento por empleado' : 'Mi equipo' }}</NuxtLink>
         <NuxtLink class="nav" :class="{ on: route.path === '/rendimiento' }" to="/rendimiento">{{ gerencia ? 'Indicadores, metas y pesos' : 'Rendimiento e indicadores' }}</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: capEquipo }" to="/capacitaciones?tab=equipo">Capacitaciones del equipo</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: pauEquipo }" to="/pausas-activas?tab=equipo">Pausas activas</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: isOn('/descargas') }" to="/descargas">Descargas del personal</NuxtLink>
       </template>
       <template v-if="gerencia || auxiliar">
         <div class="sect">PAGOS AL PERSONAL</div>
@@ -127,6 +136,9 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
         <NuxtLink class="nav" :class="{ on: asisEquipo }" to="/asistencia?tab=equipo">Asistencia y ausencias</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/plataformas') }" to="/plataformas">Actualización de plataformas</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/rutas') }" to="/rutas">Rutas del equipo</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: capEquipo }" to="/capacitaciones?tab=equipo">Capacitaciones del equipo</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: pauEquipo }" to="/pausas-activas?tab=equipo">Pausas activas (horario)</NuxtLink>
+        <NuxtLink class="nav" :class="{ on: isOn('/descargas') }" to="/descargas">Descargas del personal</NuxtLink>
       </template>
 
       <template v-if="manager">
@@ -137,6 +149,7 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
       </template>
 
       <div class="side-foot">
+        <NuxtLink class="nav" :class="{ on: route.path === '/capacitaciones' && !capEquipo }" to="/capacitaciones">Mis capacitaciones</NuxtLink>
         <NuxtLink class="nav" :class="{ on: isOn('/perfil') }" to="/perfil">Mi perfil</NuxtLink>
         <button type="button" class="nav nav-btn" @click="auth.logout()">Cerrar sesión</button>
       </div>

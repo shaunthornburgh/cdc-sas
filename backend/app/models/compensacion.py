@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
     text,
 )
@@ -79,6 +81,43 @@ class Cierre(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     estado: Mapped[EstadoCierre] = mapped_column(
         pg_enum(EstadoCierre, "estado_cierre"), default=EstadoCierre.CERRADO
     )
+
+    # ---- «Negocios» (X02 · M16): the deal's own data and its signature flow.
+    inmueble_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("inmuebles.id", ondelete="SET NULL")
+    )
+    valor: Mapped[int | None] = mapped_column(BigInteger)  # monthly rent or sale price, COP
+    etapa: Mapped[str | None] = mapped_column(String(40))  # example stages (services.negocios)
+    oferta: Mapped[str | None] = mapped_column(String(300))  # «Última oferta»
+    pct_venta: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))  # None = Configuración's
+    uso_comercial: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    arrendatario_juridica: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+    referido: Mapped[str | None] = mapped_column(String(200))
+    docs_ubicacion: Mapped[str | None] = mapped_column(String(300))
+    contrato_adjunto: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    notaria: Mapped[str | None] = mapped_column(String(200))
+    notaria_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # «Solicitar cierre» by the asesor: 'promesa' (sale, first signature) or 'cierre'.
+    solicitud: Mapped[str | None] = mapped_column(String(10))
+    solicitud_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    solicitud_nota: Mapped[str | None] = mapped_column(String(300))
+    devuelto_motivo: Mapped[str | None] = mapped_column(String(300))
+    devuelto_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Signatures confirmed by the Auxiliar: promesa (sales only) and the closing one.
+    promesa_fecha: Mapped[date | None] = mapped_column(Date)
+    firma_fecha: Mapped[date | None] = mapped_column(Date, index=True)  # = «negocio cerrado»
+    confirmado_por_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    caida_motivo: Mapped[str | None] = mapped_column(String(100))
+    caida_obs: Mapped[str | None] = mapped_column(String(300))
+    caida_reportada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    caida_reportada_por_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    caida_confirmada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     lead: Mapped[Lead] = relationship(lazy="joined")
     cerrador: Mapped[User | None] = relationship(foreign_keys=[cerrador_id], lazy="joined")

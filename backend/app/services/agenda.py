@@ -48,6 +48,7 @@ TIPOS = {
     "seg": "Seguimiento o pendiente",
     "ped": "Vencimiento",
     "ctl": "Control e inventario",
+    "cap": "Capacitación",
     "mia": "Agregada por la persona",
     "asg": "Asignada por otra persona",
 }
@@ -263,6 +264,10 @@ def sistema(db: Session, viewer: User, target: User, d1: date, d2: date) -> list
         from app.services import rutas
 
         out += rutas.agenda_items(db, target, d1, d2, propia=yo)
+
+    from app.services import capacitaciones
+
+    out += capacitaciones.agenda_items(db, target, d1, d2, propia=yo)
 
     peds = db.scalars(
         select(Pedido).where(

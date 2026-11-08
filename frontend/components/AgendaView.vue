@@ -48,6 +48,7 @@ const LEYENDA: [AgTipo, string][] = [
   ['ped', 'Vencimiento o requiere acción'],
   ['ctl', 'Control e inventario'],
   ['ruta', 'Ruta del coordinador'],
+  ['cap', 'Capacitación'],
   ['mia', 'Agregada por la persona'],
   ['asg', 'Asignada por otra persona'],
 ]

@@ -10,6 +10,11 @@ from app.models.administracion import (
 )
 from app.models.asistencia import AsistenciaEvento, Marcacion, Sede, UbicacionAsignada
 from app.models.avisos import AgendaItem, Aviso, AvisoNota, Comunicado
+from app.models.capacitaciones import (
+    Capacitacion,
+    CapacitacionEvento,
+    CapacitacionParticipante,
+)
 from app.models.captaciones import Captacion, CaptacionEvento
 from app.models.compensacion import (
     Bono,
@@ -26,7 +31,9 @@ from app.models.inmuebles import Inmueble, InmuebleEvento
 from app.models.integraciones import Integracion, IntegracionEvento
 from app.models.leads import Cita, Lead, LeadEvento, Seguimiento
 from app.models.movimientos import Movimiento, MovimientoEvento, MovimientosConfig
+from app.models.negocios import NegocioAbono
 from app.models.novedades import Novedad
+from app.models.pausas import PausaActiva, PausaConfig
 from app.models.pedidos import Pedido, PedidoEvento
 from app.models.plataformas import (
     Plataforma,
@@ -52,6 +59,9 @@ __all__ = [
     "Base",
     "Bono",
     "Calificacion",
+    "Capacitacion",
+    "CapacitacionEvento",
+    "CapacitacionParticipante",
     "Captacion",
     "CaptacionEvento",
     "Cierre",
@@ -75,8 +85,11 @@ __all__ = [
     "Movimiento",
     "MovimientoEvento",
     "MovimientosConfig",
+    "NegocioAbono",
     "Novedad",
     "Pago",
+    "PausaActiva",
+    "PausaConfig",
     "Pedido",
     "Plataforma",
     "Poliza",

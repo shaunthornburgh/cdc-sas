@@ -326,9 +326,10 @@ const PEND: Record<string, string> = {
       <!-- ============ Negocios cerrados ============ -->
       <div v-else-if="tab === 'neg'" class="card stack">
         <div class="note">
-          Cada lead «Ganado» es un negocio cerrado. Registra la <b>ganancia efectiva</b> (lo que recibe la inmobiliaria después de colegas y
-          referidos, sin IVA) y, si aplica, quién captó el inmueble: el sistema genera las comisiones de quien cerró, quien captó y Atención y
-          Preventa. Si el lead deja de estar «Ganado», el negocio queda «caído» y sus comisiones sin pagar se anulan.
+          Cada lead «Ganado» es un negocio (<NuxtLink to="/negocios" class="lnk">ver en «Negocios»</NuxtLink>). Cuando la Auxiliar confirma la firma y da
+          «negocio cerrado», la <b>ganancia efectiva</b> (lo que recibe la inmobiliaria después de referidos, sin IVA) se calcula con el valor del
+          negocio y las tarifas de Gerencia, y el sistema genera las comisiones de quien cerró, quien captó y Atención y Preventa. Aquí puedes elegir
+          quién captó el inmueble o registrarla a mano si el negocio no tiene valor. Si el negocio cae, sus comisiones sin pagar se anulan.
         </div>
         <div class="wrap">
           <table class="tbl t-neg">
@@ -359,7 +360,7 @@ const PEND: Record<string, string> = {
             </tbody>
           </table>
         </div>
-        <span class="chip pend self-start">Valor de cada negocio y pagos parciales en ventas: cuando exista el módulo de negocios, la ganancia saldrá de allí.</span>
+        <span class="chip pend self-start">Comisión parcial por cada pago recibido en ventas: PENDIENTE DE CONFIGURACIÓN.</span>
       </div>
 
       <!-- ============ Configuración ============ -->
@@ -438,5 +439,9 @@ tr.caido td {
 .empty {
   text-align: center;
   padding: 24px 10px;
+}
+.lnk {
+  color: var(--cdc-green);
+  font-weight: 700;
 }
 </style>

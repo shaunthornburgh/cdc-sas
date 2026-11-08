@@ -13,7 +13,7 @@ export interface AgAcciones {
   eliminar: boolean
 }
 
-export type AgTipo = 'cita' | 'seg' | 'ped' | 'ctl' | 'mia' | 'asg' | 'ruta'
+export type AgTipo = 'cita' | 'seg' | 'ped' | 'ctl' | 'mia' | 'asg' | 'ruta' | 'cap'
 
 export interface AgEntrada {
   id: string

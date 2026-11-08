@@ -27,12 +27,13 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     Calificacion,
     Captacion,
+    Cierre,
     Cita,
     Lead,
     LeadEvento,
@@ -46,6 +47,7 @@ from app.models.enums import (
     ActividadComercial,
     Cargo,
     EstadoCaptacion,
+    EstadoCierre,
     EstadoCita,
     EstadoPedido,
     EtapaLead,
@@ -728,6 +730,8 @@ class Calculo:
                     Lead.etapa == EtapaLead.GANADO,
                     Lead.cerrado_at >= self.p.start,
                     Lead.cerrado_at < self.p.end,
+                    # «Negocio caído» confirmed by the Auxiliar: it no longer counts (G-055).
+                    ~exists().where(Cierre.lead_id == Lead.id, Cierre.estado == EstadoCierre.CAIDO),
                 )
             ).unique()
             out = []

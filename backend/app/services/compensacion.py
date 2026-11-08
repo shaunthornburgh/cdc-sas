@@ -102,6 +102,18 @@ CONFIG_LABELS = {
     "dia_corte_2": "Salario · día del 2.º corte",
 }
 CITAS_DE_CLIENTE = (TipoCita.VISITA_ARRIENDO, TipoCita.VISITA_VENTA, TipoCita.REUNION_ASESORIA)
+# «Negocios» (M16): example stages until Gerencia defines them (PENDIENTE DE CONFIGURACIÓN). The
+# last one is set only when the Auxiliar confirms the closing signature.
+ETAPAS_NEGOCIO = {
+    TipoNegocio.ARRIENDO: ["Estudio del arrendatario", "Contrato en firma", "Contrato firmado"],
+    TipoNegocio.VENTA: ["Oferta presentada", "Promesa firmada", "Escrituración", "Escriturada"],
+}
+
+
+def etapas_de(negocio: TipoNegocio | None) -> list[str]:
+    return ETAPAS_NEGOCIO[negocio or TipoNegocio.ARRIENDO]
+
+
 ESTADO_LABELS = {
     "comision": {
         E.GENERADA: "Generada",
@@ -277,11 +289,13 @@ def sincronizar_cierres(db: Session, actor: User | None = None) -> None:
                 cerrado_at=lead.cerrado_at or fechas.now(),
                 cerrador_id=_cerrador(lead),
                 filtro_id=filtro.id if filtro else None,
+                etapa=etapas_de(lead.negocio)[0],
             )
             db.add(c)
             db.flush()
             _ev(db, "cierre", c.id, f"Negocio {c.code} registrado: lead {lead.code} ganado", actor)
-        elif c.estado == EstadoCierre.CAIDO:
+        elif c.estado == EstadoCierre.CAIDO and c.caida_confirmada_at is None:
+            # A caída confirmed in «Negocios» stays: the lead being «Ganado» doesn't undo it.
             c.estado = EstadoCierre.CERRADO
             _ev(db, "cierre", c.id, f"Negocio {c.code} reabierto: el lead volvió a «Ganado»", actor)
     for lead_id, c in con.items():

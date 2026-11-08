@@ -692,6 +692,204 @@ def _poliza_aprobada(db: Session, u: User, now: datetime) -> list[Spec]:
     return out[:MAX_POR_TIPO]
 
 
+@generador(
+    {"gerencia", "coordinacion", "auxiliar", "atencion", "asesores"}, "capacitacion_responder"
+)
+def _capacitacion_responder(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-046: a programmed training to accept, or say why you can't."""
+    from app.services import capacitaciones as cap
+
+    return [
+        Spec(
+            clave=f"capacitacion_responder:{c.id}",
+            tipo="capacitacion_responder",
+            tipo_txt="Capacitación programada",
+            nivel="info",
+            titulo=f"Capacitación: {c.tema}",
+            detalle=f"{cap.cuando(c.inicio_at)} · {c.area} · presenta {c.presenta}",
+            que_hacer="Acepta tu participación o di el motivo si no puedes.",
+            limite_at=c.inicio_at,
+            link="/capacitaciones",
+            accion_txt="Responder",
+        )
+        for c in cap.por_responder(db, u, now)
+    ][:MAX_POR_TIPO]
+
+
+@generador({"gerencia", "coordinacion", "auxiliar"}, "capacitacion_completar")
+def _capacitacion_completar(db: Session, u: User, now: datetime) -> list[Spec]:
+    """A training you programmed already happened: mark who attended."""
+    from app.services import capacitaciones as cap
+
+    return [
+        Spec(
+            clave=f"capacitacion_completar:{c.id}",
+            tipo="capacitacion_completar",
+            tipo_txt="Marcar asistencia",
+            nivel="warn",
+            titulo=f"Marca la asistencia de {c.code} · {c.tema}",
+            detalle=f"Fue el {cap.cuando(c.inicio_at)}.",
+            que_hacer="Marca quiénes participaron para cerrarla.",
+            link="/capacitaciones?tab=equipo",
+            accion_txt="Marcar asistencia",
+        )
+        for c in cap.por_completar(db, u, now)
+    ][:MAX_POR_TIPO]
+
+
+@generador({"gerencia", "auxiliar"}, "capacitacion_registrada", auto=False)
+def _capacitacion_registrada(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-046: someone registered a training they took (it goes to the Auxiliar and Gerencia)."""
+    from app.services import capacitaciones as cap
+
+    return [
+        Spec(
+            clave=f"capacitacion_registrada:{c.id}",
+            tipo="capacitacion_registrada",
+            tipo_txt="Capacitación registrada",
+            nivel="info",
+            titulo=f"{c.created_by.full_name if c.created_by else 'Alguien'} registró "
+            "una capacitación",
+            detalle=f"{c.tema} · {cap.cuando(c.inicio_at)} · presentó {c.presenta}",
+            link="/capacitaciones?tab=equipo",
+            requiere_accion=False,
+        )
+        for c in cap.registradas_desde(db, now - timedelta(days=15), u.id)
+    ][:MAX_POR_TIPO]
+
+
+@generador({"auxiliar"}, "negocio_por_confirmar")
+def _negocio_por_confirmar(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-029 / G-055: signatures and caídas the asesores asked the Auxiliar to confirm."""
+    from app.services import negocios
+
+    out = []
+    for c in negocios.por_confirmar(db):
+        ase = c.cerrador.full_name if c.cerrador else "El asesor"
+        if c.caida_reportada_at:
+            out.append(
+                Spec(
+                    clave=f"negocio_caida:{c.id}:{c.caida_reportada_at.isoformat()}",
+                    tipo="negocio_por_confirmar",
+                    tipo_txt="Caída por confirmar",
+                    nivel="bad",
+                    titulo=f"{ase} reportó que {c.code} se cayó",
+                    detalle=f"{c.caida_motivo} · {c.caida_obs}",
+                    que_hacer="Confirma la caída o sigue con el negocio.",
+                    link="/negocios?tab=sol",
+                    accion_txt="Ver negocio",
+                )
+            )
+            continue
+        promesa = c.solicitud == "promesa"
+        cuando = c.solicitud_at.isoformat() if c.solicitud_at else ""
+        out.append(
+            Spec(
+                clave=f"negocio_firma:{c.id}:{cuando}",
+                tipo="negocio_por_confirmar",
+                tipo_txt="Firma por confirmar",
+                nivel="warn",
+                titulo=(
+                    f"Confirma la firma de la promesa de {c.code}"
+                    if promesa
+                    else f"Confirma la firma de {c.code}"
+                ),
+                detalle=f"{ase} dice que el cliente {c.lead.full_name} firmó.",
+                que_hacer="Confirma la firma (fecha y documento) o devuélvela con motivo.",
+                link="/negocios?tab=sol",
+                accion_txt="Confirmar firma",
+            )
+        )
+    return out[:MAX_POR_TIPO]
+
+
+@generador({"asesores"}, "negocio_devuelto")
+def _negocio_devuelto(db: Session, u: User, now: datetime) -> list[Spec]:
+    """The Auxiliar returned the closing request with a reason."""
+    from app.services import negocios
+
+    return [
+        Spec(
+            clave=f"negocio_devuelto:{c.id}:{c.devuelto_at.isoformat() if c.devuelto_at else ''}",
+            tipo="negocio_devuelto",
+            tipo_txt="Cierre devuelto",
+            nivel="warn",
+            titulo=f"La Auxiliar devolvió el cierre de {c.code}",
+            detalle=f"Motivo: {c.devuelto_motivo}",
+            que_hacer="Revisa el motivo y vuelve a solicitar el cierre cuando el cliente firme.",
+            link="/negocios",
+            accion_txt="Ver negocio",
+        )
+        for c in negocios.devueltos_de(db, u)
+    ][:MAX_POR_TIPO]
+
+
+@generador({"asesores"}, "negocio_notaria")
+def _negocio_notaria(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-031: reminder of the notary appointment (2 days before, PENDIENTE DE CONFIGURACIÓN)."""
+    from app.services import negocios
+
+    return [
+        Spec(
+            clave=f"negocio_notaria:{c.id}:{c.notaria_at.isoformat()}",
+            tipo="negocio_notaria",
+            tipo_txt="Cita en notaría",
+            nivel="info",
+            titulo=f"Cita en notaría de {c.code}: {fechas.fmt(c.notaria_at)}",
+            detalle=f"{c.notaria} · cliente {c.lead.full_name}",
+            que_hacer="Confirma con el cliente y revisa que la documentación esté lista.",
+            limite_at=c.notaria_at,
+            link="/negocios",
+            accion_txt="Ver negocio",
+        )
+        for c in negocios.notaria_proxima(db, u, now)
+        if c.notaria_at
+    ][:MAX_POR_TIPO]
+
+
+@generador({"asesores", "gerencia"}, "negocio_caido", auto=False)
+def _negocio_caido(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-055: the Auxiliar confirmed a «negocio caído» (asesor: their own; Gerencia: all)."""
+    from app.services import negocios
+
+    mio = None if u.cargo == Cargo.GERENCIA else u
+    return [
+        Spec(
+            clave=f"negocio_caido:{c.id}",
+            tipo="negocio_caido",
+            tipo_txt="Negocio caído",
+            nivel="bad",
+            titulo=f"Negocio caído: {c.code} · {c.lead.full_name}",
+            detalle=f"{c.caida_motivo} · {c.caida_obs}",
+            que_hacer="Sale de «En proceso» y no genera comisión.",
+            link="/negocios?tab=cai" if mio is None else "/negocios",
+            requiere_accion=False,
+        )
+        for c in negocios.caidos_desde(db, now - timedelta(days=15), mio)
+    ][:MAX_POR_TIPO]
+
+
+@generador({"asesores"}, "negocio_cerrado", auto=False)
+def _negocio_cerrado(db: Session, u: User, now: datetime) -> list[Spec]:
+    """G-029: the Auxiliar confirmed the signature; the deal counts and generates commission."""
+    from app.services import negocios
+
+    return [
+        Spec(
+            clave=f"negocio_cerrado:{c.id}",
+            tipo="negocio_cerrado",
+            tipo_txt="Negocio cerrado",
+            nivel="info",
+            titulo=f"¡Negocio cerrado! {c.code} · {c.lead.full_name}",
+            detalle="La Auxiliar administrativa confirmó la firma.",
+            que_hacer="Ya cuenta en tus resultados; la comisión se paga el 5 del mes siguiente.",
+            link="/negocios",
+            requiere_accion=False,
+        )
+        for c in negocios.cerrados_desde(db, fechas.local_date(now) - timedelta(days=15), u)
+    ][:MAX_POR_TIPO]
+
+
 @generador({"asesores"}, "ruta_por_aceptar")
 def _ruta_por_aceptar(db: Session, u: User, now: datetime) -> list[Spec]:
     """G-083 «Nueva ruta asignada»: accept it or reject it with a reason."""
