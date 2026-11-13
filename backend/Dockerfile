@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir .
 # Copy application code
 COPY app ./app
 
+# Copy Alembic migration files so we can run migrations inside the container
+COPY alembic.ini ./
+COPY alembic ./alembic
+
 # Non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
