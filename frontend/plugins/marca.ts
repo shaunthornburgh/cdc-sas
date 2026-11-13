@@ -6,12 +6,7 @@ import type { Marca } from '~/types/configuracion'
  */
 export default defineNuxtPlugin(async () => {
   const marca = useMarca()
-  if (import.meta.server) {
-    try {
-      marca.value = await $fetch<Marca>(`${useRuntimeConfig().public.apiBase}/configuracion/marca`)
-    } catch {
-      // API down: keep Casa Dolce Casa's brand
-    }
-  }
+  
   useHead({ htmlAttrs: { style: computed(() => marcaVars(marca.value)) } })
 })
+

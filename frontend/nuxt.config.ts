@@ -43,6 +43,7 @@ export default defineNuxtConfig({
     '/citas': { ssr: false },
     '/mis-citas': { ssr: false },
     '/captaciones': { ssr: false },
+    '/login': { ssr: false },
   },
 
   app: {
